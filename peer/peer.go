@@ -23,6 +23,7 @@ type MessageType byte
 const (
 	NodeIdHandshake MessageType = 0x0a
 	ConfirmReq      MessageType = 0x04
+	KeepAlive       MessageType = 0x02
 )
 
 type MessageHeader struct {
@@ -33,11 +34,6 @@ type MessageHeader struct {
 	VersionMin   uint8
 	MessageType  MessageType
 	Extensions   uint16
-}
-
-type NodeIdResponse struct {
-	Account   [32]byte
-	Signature [64]byte
 }
 
 func (p *Peer) NewMessageHeader(messageType MessageType, extensions uint16) []byte {
@@ -102,8 +98,54 @@ func (p *Peer) handleMessages() {
 		switch header.MessageType {
 		case NodeIdHandshake:
 			p.handleNodeIdHandshake(header.Extensions)
+		case ConfirmReq:
+			p.handleConfirmReq(header.Extensions)
+		case KeepAlive:
+			p.handleKeepAlive(header.Extensions)
 		default:
-			log.Fatalf("Unknown message type: %x", header.MessageType)
+			log.Fatalf("Unknown message type: 0x%x", header.MessageType)
+		}
+	}
+}
+
+func (p *Peer) handleKeepAlive(extensions uint16) {
+	type Socket struct {
+		Address [16]byte
+		Port    uint16
+	}
+
+	var peers []*Socket
+
+	for i := 0; i < 8; i++ {
+		socket := &Socket{}
+		peers = append(peers, socket)
+		if err := binary.Read(p.conn, binary.LittleEndian, socket); err != nil {
+			log.Fatalf("Error reading hash pair: %v", err)
+		}
+	}
+}
+
+func (p *Peer) handleConfirmReq(extensions uint16) {
+	type HashPair struct {
+		First  [32]byte
+		Second [32]byte
+	}
+
+	var count uint16
+	var isV2 = (extensions & 1) != 0
+
+	if isV2 {
+		left := (extensions & 0xf000) >> 12
+		right := (extensions & 0x00f0) >> 4
+		count = (left << 4) | right
+	} else {
+		count = (extensions & 0xf000) >> 12
+	}
+
+	for i := 0; i < int(count); i++ {
+		pair := &HashPair{}
+		if err := binary.Read(p.conn, binary.LittleEndian, pair); err != nil {
+			log.Fatalf("Error reading hash pair: %v", err)
 		}
 	}
 }
@@ -113,19 +155,22 @@ func (p *Peer) handleNodeIdHandshake(extensions uint16) {
 		log.Fatalf("Handshake already completed")
 	}
 
-	var cookie []byte
-	var idResponse *NodeIdResponse
+	type NodeIdResponse struct {
+		Account   [32]byte
+		Signature [64]byte
+	}
 
-	if extensions&1 != 0 {
+	var cookie []byte
+
+	if (extensions & 1) != 0 {
 		cookie = make([]byte, 32)
 		if _, err := p.conn.Read(cookie); err != nil {
 			log.Fatalf("Error reading cookie data: %v", err)
 		}
-		fmt.Println("Read cookie")
 	}
 
-	if extensions&2 != 0 {
-		idResponse = &NodeIdResponse{}
+	if (extensions & 2) != 0 {
+		idResponse := &NodeIdResponse{}
 		if err := binary.Read(p.conn, binary.LittleEndian, idResponse); err != nil {
 			log.Fatalf("Error reading NodeIdResponse: %v", err)
 		}
@@ -133,7 +178,6 @@ func (p *Peer) handleNodeIdHandshake(extensions uint16) {
 			log.Fatalf("Invalid signature")
 		}
 		p.id = idResponse.Account[:]
-		fmt.Println("Verified signature")
 	}
 
 	if cookie != nil {
@@ -151,7 +195,5 @@ func (p *Peer) handleNodeIdHandshake(extensions uint16) {
 		if _, err := p.conn.Write(message); err != nil {
 			log.Fatalf("Error writing handshake response: %v", err)
 		}
-
-		fmt.Println("sent response")
 	}
 }
