@@ -24,6 +24,7 @@ const (
 	NodeIdHandshake MessageType = 0x0a
 	ConfirmReq      MessageType = 0x04
 	KeepAlive       MessageType = 0x02
+	AscPullReq      MessageType = 0x0e
 )
 
 type MessageHeader struct {
@@ -67,9 +68,6 @@ func NewPeer(config config.Config, conn net.Conn, weInitiated bool) *Peer {
 
 	go p.handleMessages()
 
-	fmt.Println(conn.RemoteAddr())
-	fmt.Println(conn.LocalAddr())
-
 	if weInitiated {
 		message := p.NewMessageHeader(NodeIdHandshake, 1)
 		message = append(message, p.cookie...)
@@ -102,9 +100,55 @@ func (p *Peer) handleMessages() {
 			p.handleConfirmReq(header.Extensions)
 		case KeepAlive:
 			p.handleKeepAlive(header.Extensions)
+		case AscPullReq:
+			p.handleAscPullReq(header.Extensions)
 		default:
 			log.Fatalf("Unknown message type: 0x%x", header.MessageType)
 		}
+	}
+}
+
+func (p *Peer) handleAscPullReq(extensions uint16) {
+	type Type byte
+	const (
+		Invalid     Type = 0x0
+		Blocks      Type = 0x1
+		AccountInfo Type = 0x2
+		Frontiers   Type = 0x3
+	)
+
+	type HashType byte
+	const (
+		Account = 0
+		Block   = 1
+	)
+
+	type Header struct {
+		Type Type
+		Id   uint64
+	}
+
+	type BlocksPayload struct {
+		Start     [32]byte
+		Count     uint8
+		StartType HashType
+	}
+
+	header := &Header{}
+	if err := binary.Read(p.conn, binary.BigEndian, header); err != nil {
+		log.Fatalf("Error reading AscPullReq header: %v", err)
+	}
+
+	switch header.Type {
+	case Blocks:
+		payload := &BlocksPayload{}
+		if err := binary.Read(p.conn, binary.BigEndian, payload); err != nil {
+			log.Fatalf("Error reading Blocks payload: %v", err)
+		}
+	case AccountInfo:
+	case Frontiers:
+	default:
+		log.Fatalf("Unknown AscPullReq type: %x", header.Type)
 	}
 }
 
