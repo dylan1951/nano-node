@@ -25,6 +25,7 @@ const (
 	ConfirmReq      MessageType = 0x04
 	KeepAlive       MessageType = 0x02
 	AscPullReq      MessageType = 0x0e
+	TelemetryReq    MessageType = 0x0c
 )
 
 type MessageHeader struct {
@@ -102,10 +103,16 @@ func (p *Peer) handleMessages() {
 			p.handleKeepAlive(header.Extensions)
 		case AscPullReq:
 			p.handleAscPullReq(header.Extensions)
+		case TelemetryReq:
+			p.handleTelemetryReq(header.Extensions)
 		default:
 			log.Fatalf("Unknown message type: 0x%x", header.MessageType)
 		}
 	}
+}
+
+func (p *Peer) handleTelemetryReq(extensions uint16) {
+
 }
 
 func (p *Peer) handleAscPullReq(extensions uint16) {
