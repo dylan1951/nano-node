@@ -1,6 +1,7 @@
 package blocks
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -19,16 +20,16 @@ type StateBlock struct {
 }
 
 func (b *StateBlock) Hash() [32]byte {
-	preamble := [32]byte{}
-	preamble[31] = byte(State)
-	hash, _ := blake2b.New256(nil)
-	hash.Write(preamble[:])
-	hash.Write(b.Account[:])
-	hash.Write(b.Previous[:])
-	hash.Write(b.Representative[:])
-	hash.Write(b.Balance[:])
-	hash.Write(b.Link[:])
-	return [32]byte(hash.Sum(nil))
+	preamble := [32]byte{31: byte(State)}
+	var buf bytes.Buffer
+	buf.Grow(176)
+	buf.Write(preamble[:])
+	buf.Write(b.Account[:])
+	buf.Write(b.Previous[:])
+	buf.Write(b.Representative[:])
+	buf.Write(b.Balance[:])
+	buf.Write(b.Link[:])
+	return blake2b.Sum256(buf.Bytes())
 }
 
 func (b *StateBlock) Print() {

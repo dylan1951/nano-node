@@ -88,7 +88,6 @@ func (p *Peer) handleAscPullAck(extensions uint16) {
 		for b != nil {
 			hash := b.Hash()
 			fmt.Println(hex.EncodeToString(hash[:]))
-			b.Print()
 			b = blocks.Read(p.Conn)
 		}
 	case ascpullreq.Frontiers:
