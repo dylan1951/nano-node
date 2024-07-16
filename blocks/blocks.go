@@ -1,22 +1,23 @@
 package blocks
 
 import (
+	"bytes"
 	"encoding/binary"
+	"io"
 	"log"
-	"net"
 	"node/types"
 	"node/utils"
 )
 
-type BlockType byte
+type Type byte
 
 const (
-	NotABlock BlockType = 1
-	Send      BlockType = 2
-	Receive   BlockType = 3
-	Open      BlockType = 4
-	Change    BlockType = 5
-	State     BlockType = 6
+	NotABlock Type = 1
+	Send      Type = 2
+	Receive   Type = 3
+	Open      Type = 4
+	Change    Type = 5
+	State     Type = 6
 )
 
 //goland:noinspection SpellCheckingInspection
@@ -40,12 +41,14 @@ var BetaGenesisBlock = OpenBlock{
 type Block interface {
 	Print()
 	Hash() [32]byte
+	Serialize() []byte
+	Type() Type
 }
 
-func Read(conn net.Conn) Block {
-	var blockType BlockType
+func Read(reader io.Reader) Block {
+	var blockType Type
 
-	if err := binary.Read(conn, binary.BigEndian, &blockType); err != nil {
+	if err := binary.Read(reader, binary.BigEndian, &blockType); err != nil {
 		log.Fatalf("Failed to read block type: %v", err)
 	}
 
@@ -53,15 +56,15 @@ func Read(conn net.Conn) Block {
 
 	switch blockType {
 	case Open:
-		block = utils.Read[OpenBlock](conn, binary.LittleEndian)
+		block = utils.Read[OpenBlock](reader, binary.LittleEndian)
 	case Send:
-		block = utils.Read[SendBlock](conn, binary.LittleEndian)
+		block = utils.Read[SendBlock](reader, binary.LittleEndian)
 	case Receive:
-		block = utils.Read[ReceiveBlock](conn, binary.LittleEndian)
+		block = utils.Read[ReceiveBlock](reader, binary.LittleEndian)
 	case Change:
-		block = utils.Read[ChangeBlock](conn, binary.LittleEndian)
+		block = utils.Read[ChangeBlock](reader, binary.LittleEndian)
 	case State:
-		block = utils.Read[StateBlock](conn, binary.BigEndian)
+		block = utils.Read[StateBlock](reader, binary.BigEndian)
 	case NotABlock:
 		return nil
 	default:
@@ -69,4 +72,8 @@ func Read(conn net.Conn) Block {
 	}
 
 	return block
+}
+
+func Deserialize(serialized []byte) Block {
+	return Read(bytes.NewReader(serialized))
 }

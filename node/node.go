@@ -4,16 +4,19 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"node/blocks"
 	"node/config"
 	"node/peer"
 )
 
 type Node struct {
-	peers []*peer.Peer
+	peers      []*peer.Peer
+	blocksChan chan blocks.Block
 }
 
 func NewNode() *Node {
 	node := &Node{}
+	node.blocksChan = make(chan blocks.Block, 100)
 	return node
 }
 
@@ -36,7 +39,7 @@ func (n *Node) connectPeer(address string) {
 		log.Fatalf("Error: %v\n", err)
 	}
 	fmt.Println("Connected")
-	n.peers = append(n.peers, peer.NewPeer(conn, true))
+	n.peers = append(n.peers, peer.NewPeer(conn, n.blocksChan, true))
 }
 
 func (n *Node) Listen() {
@@ -51,6 +54,6 @@ func (n *Node) Listen() {
 		if err != nil {
 			log.Fatalf("Error accepting: %v", err.Error())
 		}
-		n.peers = append(n.peers, peer.NewPeer(conn, false))
+		n.peers = append(n.peers, peer.NewPeer(conn, n.blocksChan, false))
 	}
 }

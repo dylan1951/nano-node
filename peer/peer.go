@@ -16,16 +16,18 @@ import (
 )
 
 type Peer struct {
-	conn   net.Conn
-	cookie []byte
-	id     ed25519.PublicKey
-	ready  bool
+	Conn       net.Conn
+	cookie     []byte
+	id         ed25519.PublicKey
+	Ready      bool
+	blocksChan chan blocks.Block
 }
 
-func NewPeer(conn net.Conn, weInitiated bool) *Peer {
+func NewPeer(conn net.Conn, blocks chan blocks.Block, weInitiated bool) *Peer {
 	p := new(Peer)
-	p.conn = conn
+	p.Conn = conn
 	p.cookie = make([]byte, 32)
+	p.blocksChan = blocks
 
 	if _, err := rand.Read(p.cookie); err != nil {
 		log.Fatalf("Error generating random bytes: %v", err)
@@ -43,7 +45,7 @@ func NewPeer(conn net.Conn, weInitiated bool) *Peer {
 func (p *Peer) handleMessages() {
 	for {
 		header := &message.Header{}
-		if err := binary.Read(p.conn, binary.LittleEndian, header); err != nil {
+		if err := binary.Read(p.Conn, binary.LittleEndian, header); err != nil {
 			log.Fatalf("Error reading message header: %v\n", err)
 		}
 
@@ -77,34 +79,26 @@ func (p *Peer) handleMessages() {
 	}
 }
 
-func (p *Peer) bootstrap() {
-	msg := ascpullreq.FrontiersRequest(blocks.BetaGenesisBlock.Account, 10)
-
-	if _, err := p.conn.Write(msg); err != nil {
-		log.Fatalf("Error writing FrontiersRequest: %v", err)
-	}
-
-	fmt.Printf("Sent %d byte FrontiersRequest\n", len(msg))
-}
-
 func (p *Peer) handleAscPullAck(extensions uint16) {
-	header := utils.Read[ascpullreq.Header](p.conn, binary.BigEndian)
+	header := utils.Read[ascpullreq.Header](p.Conn, binary.BigEndian)
 
 	switch header.Type {
 	case ascpullreq.Blocks:
-		block := blocks.Read(p.conn)
-		for block != nil {
-			block.Print()
-			block = blocks.Read(p.conn)
+		b := blocks.Read(p.Conn)
+		for b != nil {
+			hash := b.Hash()
+			fmt.Println(hex.EncodeToString(hash[:]))
+			b.Print()
+			b = blocks.Read(p.Conn)
 		}
 	case ascpullreq.Frontiers:
-		account := utils.Read[[32]byte](p.conn, binary.BigEndian)
-		hash := utils.Read[[32]byte](p.conn, binary.BigEndian)
+		account := utils.Read[[32]byte](p.Conn, binary.BigEndian)
+		hash := utils.Read[[32]byte](p.Conn, binary.BigEndian)
 
 		for *account != [32]byte{} && *hash != [32]byte{} {
 			fmt.Printf("frontier for %s is %s\n", hex.EncodeToString(account[:]), hex.EncodeToString(hash[:]))
-			account = utils.Read[[32]byte](p.conn, binary.BigEndian)
-			hash = utils.Read[[32]byte](p.conn, binary.BigEndian)
+			account = utils.Read[[32]byte](p.Conn, binary.BigEndian)
+			hash = utils.Read[[32]byte](p.Conn, binary.BigEndian)
 		}
 	default:
 		log.Fatalf("Unsupported AscPullAck PullType: %x", header.Type)
@@ -125,7 +119,7 @@ func (p *Peer) handleKeepAlive(extensions uint16) {
 	for i := 0; i < 8; i++ {
 		socket := &Socket{}
 		peers = append(peers, socket)
-		if err := binary.Read(p.conn, binary.LittleEndian, socket); err != nil {
+		if err := binary.Read(p.Conn, binary.LittleEndian, socket); err != nil {
 			log.Fatalf("Error reading hash pair: %v", err)
 		}
 	}
@@ -150,7 +144,7 @@ func (p *Peer) handleConfirmReq(extensions uint16) {
 
 	for i := 0; i < int(count); i++ {
 		pair := &HashPair{}
-		if err := binary.Read(p.conn, binary.LittleEndian, pair); err != nil {
+		if err := binary.Read(p.Conn, binary.LittleEndian, pair); err != nil {
 			log.Fatalf("Error reading hash pair: %v", err)
 		}
 	}
@@ -158,14 +152,14 @@ func (p *Peer) handleConfirmReq(extensions uint16) {
 
 func (p *Peer) handleAscPullReq(extensions uint16) {
 	header := &ascpullreq.Header{}
-	if err := binary.Read(p.conn, binary.BigEndian, header); err != nil {
+	if err := binary.Read(p.Conn, binary.BigEndian, header); err != nil {
 		log.Fatalf("Error reading AscPullReq header: %v", err)
 	}
 
 	switch header.Type {
 	case ascpullreq.Blocks:
 		payload := &ascpullreq.BlocksPayload{}
-		if err := binary.Read(p.conn, binary.BigEndian, payload); err != nil {
+		if err := binary.Read(p.Conn, binary.BigEndian, payload); err != nil {
 			log.Fatalf("Error reading Blocks payload: %v", err)
 		}
 		fmt.Printf("Start: %v\n", payload.Start)
@@ -187,7 +181,7 @@ func (p *Peer) handleNodeIdHandshake(extensions uint16) {
 
 	if (extensions & 1) != 0 {
 		cookie = make([]byte, 32)
-		if _, err := p.conn.Read(cookie); err != nil {
+		if _, err := p.Conn.Read(cookie); err != nil {
 			log.Fatalf("Error reading cookie data: %v", err)
 		}
 	}
@@ -198,7 +192,7 @@ func (p *Peer) handleNodeIdHandshake(extensions uint16) {
 			Signature [64]byte
 		}
 		idResponse := &NodeIdResponse{}
-		if err := binary.Read(p.conn, binary.LittleEndian, idResponse); err != nil {
+		if err := binary.Read(p.Conn, binary.LittleEndian, idResponse); err != nil {
 			log.Fatalf("Error reading NodeIdResponse: %v", err)
 		}
 		if !ed25519.Verify(idResponse.Account[:], p.cookie, idResponse.Signature[:]) {
@@ -226,14 +220,12 @@ func (p *Peer) handleNodeIdHandshake(extensions uint16) {
 		header := message.NewHeader(message.NodeIdHandshake, extensions).Serialize()
 		msg = append(header, msg...)
 
-		if _, err := p.conn.Write(msg); err != nil {
+		if _, err := p.Conn.Write(msg); err != nil {
 			log.Fatalf("Error writing handshake response: %v", err)
 		}
 	}
 
 	if p.id != nil {
-		// handshake completed
-		p.bootstrap()
-		p.ready = true
+		p.Ready = true
 	}
 }

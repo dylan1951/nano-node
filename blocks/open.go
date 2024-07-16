@@ -2,9 +2,11 @@ package blocks
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"golang.org/x/crypto/blake2b"
+	"node/utils"
 )
 
 type OpenBlock struct {
@@ -29,4 +31,12 @@ func (b *OpenBlock) Print() {
 	fmt.Printf("Account:        %s\n", hex.EncodeToString(b.Account[:]))
 	fmt.Printf("Signature:      %s\n", hex.EncodeToString(b.Signature[:]))
 	fmt.Printf("Work:           %x\n", b.Work)
+}
+
+func (b *OpenBlock) Serialize() []byte {
+	return append([]byte{byte(Open)}, utils.Serialize(b, binary.LittleEndian)...)
+}
+
+func (b *OpenBlock) Type() Type {
+	return Open
 }

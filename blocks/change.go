@@ -2,7 +2,11 @@ package blocks
 
 import (
 	"bytes"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"golang.org/x/crypto/blake2b"
+	"node/utils"
 )
 
 type ChangeBlock struct {
@@ -13,8 +17,10 @@ type ChangeBlock struct {
 }
 
 func (b *ChangeBlock) Print() {
-	//TODO implement me
-	panic("implement me")
+	fmt.Printf("Previous:       %s\n", hex.EncodeToString(b.Previous[:]))
+	fmt.Printf("Representative: %s\n", hex.EncodeToString(b.Representative[:]))
+	fmt.Printf("Signature:      %s\n", hex.EncodeToString(b.Signature[:]))
+	fmt.Printf("Work:           %x\n", b.Work)
 }
 
 func (b *ChangeBlock) Hash() [32]byte {
@@ -22,4 +28,12 @@ func (b *ChangeBlock) Hash() [32]byte {
 	buf.Write(b.Previous[:])
 	buf.Write(b.Representative[:])
 	return blake2b.Sum256(buf.Bytes())
+}
+
+func (b *ChangeBlock) Serialize() []byte {
+	return append([]byte{byte(Change)}, utils.Serialize(b, binary.LittleEndian)...)
+}
+
+func (b *ChangeBlock) Type() Type {
+	return Change
 }

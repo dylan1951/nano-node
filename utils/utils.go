@@ -52,3 +52,9 @@ func Read[T any](reader io.Reader, order binary.ByteOrder) *T {
 	}
 	return ret
 }
+
+func Write(writer io.Writer, value interface{}) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		log.Fatal(err)
+	}
+}

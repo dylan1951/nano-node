@@ -50,7 +50,7 @@ func BlocksRequest(start [32]byte, startType HashType) []byte {
 
 	payload := BlocksPayload{
 		Start:     start,
-		Count:     1,
+		Count:     50,
 		StartType: startType,
 	}
 
