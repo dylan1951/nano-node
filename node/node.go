@@ -9,40 +9,38 @@ import (
 )
 
 type Node struct {
-	config config.Config
-	peers  []*peer.Peer
+	peers []*peer.Peer
 }
 
-func NewNode(config config.Config) *Node {
-	return &Node{
-		config: config,
-	}
+func NewNode() *Node {
+	node := &Node{}
+	return node
 }
 
-func (n *Node) Bootstrap() {
-	ips, err := net.LookupIP(n.config.Network.Address)
+func (n *Node) Connect() {
+	ips, err := net.LookupIP(config.Network.Address)
 	if err != nil {
 		log.Fatalf("Could not get IPs: %v\n", err)
 	}
 	for _, ip := range ips {
-		address := fmt.Sprintf("%s:%d", ip.String(), n.config.Network.Port)
-		n.Connect(address)
-		return
+		address := fmt.Sprintf("%s:%d", ip.String(), config.Network.Port)
+		n.connectPeer(address)
+		break
 	}
 }
 
-func (n *Node) Connect(address string) {
+func (n *Node) connectPeer(address string) {
 	fmt.Printf("Connecting to %s\n", address)
-	conn, err := net.Dial("tcp", "168.119.169.134:17075")
+	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		log.Fatalf("Error: %v\n", err)
 	}
 	fmt.Println("Connected")
-	n.peers = append(n.peers, peer.NewPeer(n.config, conn, true))
+	n.peers = append(n.peers, peer.NewPeer(conn, true))
 }
 
 func (n *Node) Listen() {
-	address := fmt.Sprintf("%s:%d", net.IPv4zero.String(), n.config.Network.Port)
+	address := fmt.Sprintf("%s:%d", net.IPv4zero.String(), config.Network.Port)
 	l, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("Error listening: %v", err.Error())
@@ -53,6 +51,6 @@ func (n *Node) Listen() {
 		if err != nil {
 			log.Fatalf("Error accepting: %v", err.Error())
 		}
-		n.peers = append(n.peers, peer.NewPeer(n.config, conn, false))
+		n.peers = append(n.peers, peer.NewPeer(conn, false))
 	}
 }

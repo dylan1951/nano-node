@@ -1,65 +1,29 @@
 package peer
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"github.com/accept-nano/ed25519-blake2b"
 	"log"
 	"net"
+	"node/blocks"
 	"node/config"
+	"node/message"
+	"node/message/ascpullreq"
+	"node/utils"
 )
 
 type Peer struct {
-	config config.Config
 	conn   net.Conn
 	cookie []byte
 	id     ed25519.PublicKey
+	ready  bool
 }
 
-type MessageType byte
-
-const (
-	NodeIdHandshake MessageType = 0x0a
-	ConfirmReq      MessageType = 0x04
-	KeepAlive       MessageType = 0x02
-	AscPullReq      MessageType = 0x0e
-	TelemetryReq    MessageType = 0x0c
-)
-
-type MessageHeader struct {
-	Magic        byte
-	Network      byte
-	VersionMax   uint8
-	VersionUsing uint8
-	VersionMin   uint8
-	MessageType  MessageType
-	Extensions   uint16
-}
-
-func (p *Peer) NewMessageHeader(messageType MessageType, extensions uint16) []byte {
-	header := &MessageHeader{
-		Magic:        'R',
-		Network:      p.config.Network.Id,
-		VersionMax:   19,
-		VersionUsing: 20,
-		VersionMin:   18,
-		MessageType:  messageType,
-		Extensions:   extensions,
-	}
-
-	buf := new(bytes.Buffer)
-	if err := binary.Write(buf, binary.LittleEndian, header); err != nil {
-		log.Fatalf("binary.Write failed: %s", err)
-	}
-
-	return buf.Bytes()
-}
-
-func NewPeer(config config.Config, conn net.Conn, weInitiated bool) *Peer {
+func NewPeer(conn net.Conn, weInitiated bool) *Peer {
 	p := new(Peer)
-	p.config = config
 	p.conn = conn
 	p.cookie = make([]byte, 32)
 
@@ -70,12 +34,7 @@ func NewPeer(config config.Config, conn net.Conn, weInitiated bool) *Peer {
 	go p.handleMessages()
 
 	if weInitiated {
-		message := p.NewMessageHeader(NodeIdHandshake, 1)
-		message = append(message, p.cookie...)
-		if _, err := conn.Write(message); err != nil {
-			log.Fatalf("Error writing to connection: %v", err)
-		}
-		fmt.Println("Handshake message sent")
+		p.handleNodeIdHandshake(0)
 	}
 
 	return p
@@ -83,27 +42,34 @@ func NewPeer(config config.Config, conn net.Conn, weInitiated bool) *Peer {
 
 func (p *Peer) handleMessages() {
 	for {
-		header := &MessageHeader{}
+		header := &message.Header{}
 		if err := binary.Read(p.conn, binary.LittleEndian, header); err != nil {
 			log.Fatalf("Error reading message header: %v\n", err)
 		}
 
-		if header.Magic != 'R' || header.Network != p.config.Network.Id {
+		if header.Magic != 'R' || header.Network != config.Network.Id {
 			log.Fatalf("Invalid message header")
+		}
+
+		if header.VersionMax < 20 {
+			log.Println("Protocol version too low")
+			break
 		}
 
 		fmt.Printf("Received message header: %+v\n", header)
 
 		switch header.MessageType {
-		case NodeIdHandshake:
+		case message.NodeIdHandshake:
 			p.handleNodeIdHandshake(header.Extensions)
-		case ConfirmReq:
+		case message.ConfirmReq:
 			p.handleConfirmReq(header.Extensions)
-		case KeepAlive:
+		case message.KeepAlive:
 			p.handleKeepAlive(header.Extensions)
-		case AscPullReq:
+		case message.AscPullReq:
 			p.handleAscPullReq(header.Extensions)
-		case TelemetryReq:
+		case message.AscPullAck:
+			p.handleAscPullAck(header.Extensions)
+		case message.TelemetryReq:
 			p.handleTelemetryReq(header.Extensions)
 		default:
 			log.Fatalf("Unknown message type: 0x%x", header.MessageType)
@@ -111,53 +77,42 @@ func (p *Peer) handleMessages() {
 	}
 }
 
-func (p *Peer) handleTelemetryReq(extensions uint16) {
+func (p *Peer) bootstrap() {
+	msg := ascpullreq.FrontiersRequest(blocks.BetaGenesisBlock.Account, 10)
 
+	if _, err := p.conn.Write(msg); err != nil {
+		log.Fatalf("Error writing FrontiersRequest: %v", err)
+	}
+
+	fmt.Printf("Sent %d byte FrontiersRequest\n", len(msg))
 }
 
-func (p *Peer) handleAscPullReq(extensions uint16) {
-	type Type byte
-	const (
-		Invalid     Type = 0x0
-		Blocks      Type = 0x1
-		AccountInfo Type = 0x2
-		Frontiers   Type = 0x3
-	)
-
-	type HashType byte
-	const (
-		Account = 0
-		Block   = 1
-	)
-
-	type Header struct {
-		Type Type
-		Id   uint64
-	}
-
-	type BlocksPayload struct {
-		Start     [32]byte
-		Count     uint8
-		StartType HashType
-	}
-
-	header := &Header{}
-	if err := binary.Read(p.conn, binary.BigEndian, header); err != nil {
-		log.Fatalf("Error reading AscPullReq header: %v", err)
-	}
+func (p *Peer) handleAscPullAck(extensions uint16) {
+	header := utils.Read[ascpullreq.Header](p.conn, binary.BigEndian)
 
 	switch header.Type {
-	case Blocks:
-		payload := &BlocksPayload{}
-		if err := binary.Read(p.conn, binary.BigEndian, payload); err != nil {
-			log.Fatalf("Error reading Blocks payload: %v", err)
+	case ascpullreq.Blocks:
+		block := blocks.Read(p.conn)
+		for block != nil {
+			block.Print()
+			block = blocks.Read(p.conn)
 		}
-	case AccountInfo:
-	case Frontiers:
+	case ascpullreq.Frontiers:
+		account := utils.Read[[32]byte](p.conn, binary.BigEndian)
+		hash := utils.Read[[32]byte](p.conn, binary.BigEndian)
+
+		for *account != [32]byte{} && *hash != [32]byte{} {
+			fmt.Printf("frontier for %s is %s\n", hex.EncodeToString(account[:]), hex.EncodeToString(hash[:]))
+			account = utils.Read[[32]byte](p.conn, binary.BigEndian)
+			hash = utils.Read[[32]byte](p.conn, binary.BigEndian)
+		}
 	default:
-		log.Fatalf("Unknown AscPullReq type: %x", header.Type)
+		log.Fatalf("Unsupported AscPullAck PullType: %x", header.Type)
 	}
+
 }
+
+func (p *Peer) handleTelemetryReq(extensions uint16) {}
 
 func (p *Peer) handleKeepAlive(extensions uint16) {
 	type Socket struct {
@@ -201,14 +156,31 @@ func (p *Peer) handleConfirmReq(extensions uint16) {
 	}
 }
 
+func (p *Peer) handleAscPullReq(extensions uint16) {
+	header := &ascpullreq.Header{}
+	if err := binary.Read(p.conn, binary.BigEndian, header); err != nil {
+		log.Fatalf("Error reading AscPullReq header: %v", err)
+	}
+
+	switch header.Type {
+	case ascpullreq.Blocks:
+		payload := &ascpullreq.BlocksPayload{}
+		if err := binary.Read(p.conn, binary.BigEndian, payload); err != nil {
+			log.Fatalf("Error reading Blocks payload: %v", err)
+		}
+		fmt.Printf("Start: %v\n", payload.Start)
+		fmt.Printf("Count: %d\n", payload.Count)
+		fmt.Printf("StartType: %v\n", payload.StartType)
+	case ascpullreq.AccountInfo:
+	case ascpullreq.Frontiers:
+	default:
+		log.Fatalf("Unknown AscPullReq type: %x", header.Type)
+	}
+}
+
 func (p *Peer) handleNodeIdHandshake(extensions uint16) {
 	if p.id != nil {
 		log.Fatalf("Handshake already completed")
-	}
-
-	type NodeIdResponse struct {
-		Account   [32]byte
-		Signature [64]byte
 	}
 
 	var cookie []byte
@@ -221,6 +193,10 @@ func (p *Peer) handleNodeIdHandshake(extensions uint16) {
 	}
 
 	if (extensions & 2) != 0 {
+		type NodeIdResponse struct {
+			Account   [32]byte
+			Signature [64]byte
+		}
 		idResponse := &NodeIdResponse{}
 		if err := binary.Read(p.conn, binary.LittleEndian, idResponse); err != nil {
 			log.Fatalf("Error reading NodeIdResponse: %v", err)
@@ -231,20 +207,33 @@ func (p *Peer) handleNodeIdHandshake(extensions uint16) {
 		p.id = idResponse.Account[:]
 	}
 
-	if cookie != nil {
-		message := p.NewMessageHeader(NodeIdHandshake, 2)
+	if cookie != nil || p.id == nil {
+		var msg []byte
+		extensions = 0
 
 		if p.id == nil {
-			message = p.NewMessageHeader(NodeIdHandshake, 3)
-			message = append(message, p.cookie...)
+			msg = append(msg, p.cookie...)
+			extensions |= 1
 		}
 
-		signature := ed25519.Sign(p.config.PrivateKey, cookie)
-		message = append(message, p.config.PublicKey...)
-		message = append(message, signature...)
+		if cookie != nil {
+			signature := ed25519.Sign(config.PrivateKey, cookie)
+			msg = append(msg, config.PublicKey...)
+			msg = append(msg, signature...)
+			extensions |= 2
+		}
 
-		if _, err := p.conn.Write(message); err != nil {
+		header := message.NewHeader(message.NodeIdHandshake, extensions).Serialize()
+		msg = append(header, msg...)
+
+		if _, err := p.conn.Write(msg); err != nil {
 			log.Fatalf("Error writing handshake response: %v", err)
 		}
+	}
+
+	if p.id != nil {
+		// handshake completed
+		p.bootstrap()
+		p.ready = true
 	}
 }

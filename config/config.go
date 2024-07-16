@@ -1,20 +1,24 @@
 package config
 
-import "github.com/accept-nano/ed25519-blake2b"
+import (
+	"encoding/hex"
+	"github.com/accept-nano/ed25519-blake2b"
+	"github.com/joho/godotenv"
+	"log"
+	"os"
+)
 
-type Config struct {
-	PrivateKey ed25519.PrivateKey
-	PublicKey  ed25519.PublicKey
-	Network    Network
-}
+var PrivateKey ed25519.PrivateKey
+var PublicKey ed25519.PublicKey
+var Network NetworkDetail
 
-type Network struct {
+type NetworkDetail struct {
 	Id      byte
 	Address string
 	Port    uint16
 }
 
-var Networks = map[string]Network{
+var Networks = map[string]NetworkDetail{
 	"main": {
 		Id:      'C',
 		Address: "peering.nano.org",
@@ -30,4 +34,22 @@ var Networks = map[string]Network{
 		Address: "peering-beta.nano.org",
 		Port:    54000,
 	},
+}
+
+func Load() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+
+	seed, err := hex.DecodeString(os.Getenv("SEED"))
+	if err != nil || len(seed) != ed25519.SeedSize {
+		log.Fatalf("Invalid SEED in .env file")
+	}
+
+	network := os.Getenv("NETWORK")
+
+	PrivateKey = ed25519.NewKeyFromSeed(seed)
+	PublicKey = ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey)
+	Network = Networks[network]
 }
