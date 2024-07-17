@@ -1,4 +1,4 @@
-package message
+package messages
 
 import (
 	"encoding/binary"
@@ -13,6 +13,7 @@ const (
 	ConfirmReq      Type = 0x04
 	KeepAlive       Type = 0x02
 	TelemetryReq    Type = 0x0c
+	TelemetryAck    Type = 0x0d
 	AscPullReq      Type = 0x0e
 	AscPullAck      Type = 0x0f
 )

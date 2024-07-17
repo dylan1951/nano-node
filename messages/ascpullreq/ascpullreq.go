@@ -3,7 +3,7 @@ package ascpullreq
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"node/message"
+	"node/messages"
 	"node/utils"
 )
 
@@ -40,7 +40,7 @@ type FrontiersPayload struct {
 }
 
 func BlocksRequest(start [32]byte, startType HashType) []byte {
-	msg := message.NewHeader(message.AscPullReq, 34).Serialize()
+	msg := messages.NewHeader(messages.AscPullReq, 34).Serialize()
 	id := utils.Read[uint64](rand.Reader, binary.BigEndian)
 
 	header := Header{
@@ -61,7 +61,7 @@ func BlocksRequest(start [32]byte, startType HashType) []byte {
 }
 
 func FrontiersRequest(start [32]byte, count uint16) []byte {
-	msg := message.NewHeader(message.AscPullReq, 34).Serialize()
+	msg := messages.NewHeader(messages.AscPullReq, 34).Serialize()
 	id := utils.Read[uint64](rand.Reader, binary.LittleEndian)
 
 	header := Header{

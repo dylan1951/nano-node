@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 )
@@ -57,4 +59,12 @@ func Write(writer io.Writer, value interface{}) {
 	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func PrettyPrint(i interface{}) {
+	s, err := json.MarshalIndent(i, "", "\t")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(s))
 }
