@@ -1,8 +1,13 @@
-package messages
+package telemetry_ack
 
-import "node/types"
+import (
+	"encoding/binary"
+	"io"
+	"node/types"
+	"node/utils"
+)
 
-type Telemetry struct {
+type TelemetryAck struct {
 	Signature         types.Signature
 	NodeId            types.PublicKey
 	BlockCount        uint64
@@ -21,4 +26,8 @@ type Telemetry struct {
 	Maker             byte
 	Timestamp         uint64
 	ActiveDifficulty  uint64
+}
+
+func Read(reader io.Reader, extensions uint16) *TelemetryAck {
+	return utils.Read[TelemetryAck](reader, binary.BigEndian)
 }
