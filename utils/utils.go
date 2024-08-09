@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 )
 
 func ReverseBytes(bytes []byte) []byte {
@@ -67,4 +68,24 @@ func PrettyPrint(i interface{}) {
 		log.Fatal(err)
 	}
 	fmt.Println(string(s))
+}
+
+func byteArrayToPercentage(bytes [32]byte) float64 {
+	// Convert the byte array to a big.Int
+	bigIntValue := new(big.Int).SetBytes(bytes[:])
+
+	// Create a big.Int representing the maximum value (2^256 - 1)
+	maxValue := new(big.Int).Exp(big.NewInt(2), big.NewInt(256), nil)
+
+	// Create big.Float versions of bigIntValue and maxValue
+	bigFloatValue := new(big.Float).SetInt(bigIntValue)
+	bigFloatMax := new(big.Float).SetInt(maxValue)
+
+	// Calculate the percentage: (bigFloatValue / bigFloatMax) * 100
+	percentage := new(big.Float).Quo(bigFloatValue, bigFloatMax)
+	percentage.Mul(percentage, big.NewFloat(100))
+
+	// Convert to float64
+	result, _ := percentage.Float64()
+	return result
 }

@@ -1,4 +1,4 @@
-package keep_alive
+package messages
 
 import (
 	"encoding/binary"
@@ -13,7 +13,8 @@ type Socket struct {
 	Port    uint16
 }
 
-func Read(reader io.Reader, extensions uint16) *KeepAlive {
+func ReadKeepAlive(reader io.Reader, extensions uint16) *KeepAlive {
+	println("received keep alive")
 	peers := make(KeepAlive, 8)
 
 	for i := 0; i < 8; i++ {

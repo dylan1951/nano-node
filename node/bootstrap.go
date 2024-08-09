@@ -1,22 +1,47 @@
 package node
 
 import (
+	"encoding/hex"
+	"fmt"
+	"node/store"
 	"node/types"
+	"time"
 )
 
-var pool []types.Hash
-var accountRangesScanned []types.Hash
+var outdatedAccounts []types.PublicKey
 
 func (n *Node) Bootstrap() {
-	for {
-		for _, p := range n.peers {
-			//telemetry, ok := <-p.RequestTelemetry()
-			//if !ok {
-			//	log.Fatal("Failed to get telemetry from peer")
-			//}
+	for _, p := range n.peers {
+		start := [32]byte{}
 
-			return
+		for {
+			fmt.Printf("requesting frontiers from: %+v\n", hex.EncodeToString(start[:]))
+			frontiers := <-p.RequestFrontiers(start)
+
+			fmt.Printf("got %v frontiers\n", len(frontiers))
+
+			if len(frontiers) == 0 {
+				println("finished!")
+				break
+			}
+
+			for _, frontier := range frontiers {
+				//fmt.Printf("%s:%s\n", frontier.Account.GoString(), frontier.Hash.GoString())
+				account := store.GetAccount(frontier.Account)
+				if account == nil || account.Frontier != frontier.Account {
+					store.SetAccount(frontier.Account, store.Account{Frontier: frontier.Hash})
+					outdatedAccounts = append(outdatedAccounts, frontier.Account)
+				}
+
+				start = frontier.Account
+			}
+
+			time.Sleep(500 * time.Millisecond)
 		}
+
+		fmt.Printf("there are %v outdated accounts\n", len(outdatedAccounts))
+
+		return
 	}
 }
 

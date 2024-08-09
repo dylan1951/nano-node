@@ -1,4 +1,4 @@
-package asc_pull_req
+package messages
 
 import (
 	"crypto/rand"
@@ -6,15 +6,26 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"node/messages"
 	"node/utils"
 )
 
-type AscPullReq struct {
+const (
+	Invalid = iota
+	Blocks
+	AccountInfo
+	Frontiers
+)
+
+type AscPullReqHeader struct {
+	Type byte
+	Id   uint64
 }
 
-func Read(reader io.Reader, extensions uint16) *AscPullReq {
-	header := &Header{}
+type AscPullReq struct{}
+
+func ReadAscPullReq(reader io.Reader, extensions uint16) *AscPullReq {
+	println("received ReadAscPullReq")
+	header := &AscPullReqHeader{}
 	if err := binary.Read(reader, binary.BigEndian, header); err != nil {
 		log.Fatalf("Error reading AscPullReq header: %v", err)
 	}
@@ -37,26 +48,12 @@ func Read(reader io.Reader, extensions uint16) *AscPullReq {
 	return &AscPullReq{}
 }
 
-type PullType byte
-
-const (
-	Invalid     PullType = 0x0
-	Blocks      PullType = 0x1
-	AccountInfo PullType = 0x2
-	Frontiers   PullType = 0x3
-)
-
 type HashType byte
 
 const (
 	Account HashType = 0
 	Block   HashType = 1
 )
-
-type Header struct {
-	Type PullType
-	Id   uint64
-}
 
 type BlocksPayload struct {
 	Start     [32]byte
@@ -70,10 +67,10 @@ type FrontiersPayload struct {
 }
 
 func BlocksRequest(start [32]byte, startType HashType) []byte {
-	msg := messages.NewHeader(messages.MsgAscPullReq, 34).Serialize()
+	msg := NewHeader(MsgAscPullReq, 34).Serialize()
 	id := utils.Read[uint64](rand.Reader, binary.BigEndian)
 
-	header := Header{
+	header := AscPullReqHeader{
 		Type: Blocks,
 		Id:   *id,
 	}
@@ -91,10 +88,10 @@ func BlocksRequest(start [32]byte, startType HashType) []byte {
 }
 
 func FrontiersRequest(start [32]byte, count uint16) []byte {
-	msg := messages.NewHeader(messages.MsgAscPullReq, 34).Serialize()
+	msg := NewHeader(MsgAscPullReq, 34).Serialize()
 	id := utils.Read[uint64](rand.Reader, binary.LittleEndian)
 
-	header := Header{
+	header := AscPullReqHeader{
 		Type: Frontiers,
 		Id:   *id,
 	}

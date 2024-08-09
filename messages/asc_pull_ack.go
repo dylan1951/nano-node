@@ -1,4 +1,4 @@
-package asc_pull_ack
+package messages
 
 import (
 	"encoding/binary"
@@ -10,20 +10,6 @@ import (
 	"node/types"
 	"node/utils"
 )
-
-type PullType byte
-
-const (
-	Invalid     PullType = 0x0
-	Blocks      PullType = 0x1
-	AccountInfo PullType = 0x2
-	Frontiers   PullType = 0x3
-)
-
-type Header struct {
-	Type PullType
-	Id   uint64
-}
 
 type AscPullAck struct {
 	Frontiers []*Frontier
@@ -39,29 +25,35 @@ func (f *Frontier) IsZero() bool {
 	return f.Account == [32]byte{} || f.Hash == [32]byte{}
 }
 
-func Read(reader io.Reader, extensions uint16) *AscPullAck {
-	header := utils.Read[Header](reader, binary.BigEndian)
+func ReadAscPullAck(r io.Reader, extensions uint16) AscPullAck {
+	println("received ReadAscPullAck")
+	type Header struct {
+		Type byte
+		Id   uint64
+	}
+
+	header := utils.Read[Header](r, binary.BigEndian)
 	ack := AscPullAck{}
 
 	switch header.Type {
 	case Blocks:
 		ack.Blocks = make([]*blocks.Block, 1024)
 
-		for b := blocks.Read(reader); b != nil; b = blocks.Read(reader) {
+		for b := blocks.Read(r); b != nil; b = blocks.Read(r) {
 			hash := b.Hash()
 			fmt.Println(hex.EncodeToString(hash[:]))
 			ack.Blocks = append(ack.Blocks, &b)
 		}
 	case Frontiers:
-		ack.Frontiers = make([]*Frontier, 1024)
+		ack.Frontiers = make([]*Frontier, 0)
 
-		for f := utils.Read[Frontier](reader, binary.BigEndian); !f.IsZero(); f = utils.Read[Frontier](reader, binary.BigEndian) {
-			fmt.Printf("frontier for %s is %s\n", f.Account.GoString(), f.Hash.GoString())
+		for f := utils.Read[Frontier](r, binary.BigEndian); !f.IsZero(); f = utils.Read[Frontier](r, binary.BigEndian) {
+			//fmt.Printf("frontier for %s is %s\n", f.Account.GoString(), f.Hash.GoString())
 			ack.Frontiers = append(ack.Frontiers, f)
 		}
 	default:
 		log.Fatalf("Unsupported AscPullAck PullType: %x", header.Type)
 	}
 
-	return &ack
+	return ack
 }

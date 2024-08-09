@@ -1,11 +1,14 @@
 package store
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"github.com/cockroachdb/pebble"
 	"log"
 	"node/blocks"
+	"node/utils"
 )
 
 var db, _ = pebble.Open("data", &pebble.Options{})
@@ -17,6 +20,26 @@ const (
 
 type Account struct {
 	Frontier [32]byte
+}
+
+func SetAccount(publicKey [32]byte, account Account) {
+	if err := db.Set(publicKey[:], utils.Serialize(account, binary.LittleEndian), pebble.Sync); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func GetAccount(publicKey [32]byte) *Account {
+	serialized, closer, err := db.Get(publicKey[:])
+
+	if err != nil {
+		return nil
+	}
+
+	if err := closer.Close(); err != nil {
+		log.Fatal(err)
+	}
+
+	return utils.Read[Account](bytes.NewReader(serialized), binary.LittleEndian)
 }
 
 func SetPull(hash [32]byte, val byte) {

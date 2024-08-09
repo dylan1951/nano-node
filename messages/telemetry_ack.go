@@ -1,4 +1,4 @@
-package telemetry_ack
+package messages
 
 import (
 	"encoding/binary"
@@ -28,6 +28,7 @@ type TelemetryAck struct {
 	ActiveDifficulty  uint64
 }
 
-func Read(reader io.Reader, extensions uint16) *TelemetryAck {
+func ReadTelemetryAck(reader io.Reader, extensions uint16) *TelemetryAck {
+	println("received ReadTelemetryAck")
 	return utils.Read[TelemetryAck](reader, binary.BigEndian)
 }

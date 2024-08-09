@@ -1,4 +1,4 @@
-package confirm_req
+package messages
 
 import (
 	"encoding/binary"
@@ -13,7 +13,8 @@ type HashPair struct {
 	Second [32]byte
 }
 
-func Read(reader io.Reader, extensions uint16) *ConfirmReq {
+func ReadConfirmReq(reader io.Reader, extensions uint16) *ConfirmReq {
+	println("received confirm req")
 	var count uint16
 	var isV2 = (extensions & 1) != 0
 
@@ -27,7 +28,7 @@ func Read(reader io.Reader, extensions uint16) *ConfirmReq {
 
 	for i := 0; i < int(count); i++ {
 		pair := &HashPair{}
-		if err := binary.Read(p.conn, binary.LittleEndian, pair); err != nil {
+		if err := binary.Read(reader, binary.LittleEndian, pair); err != nil {
 			log.Fatalf("Error reading hash pair: %v", err)
 		}
 	}
