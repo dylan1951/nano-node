@@ -21,7 +21,7 @@ type NodeIdHandshake struct {
 	*NodeIdResponse
 }
 
-func ReadNodeIdHandshake(r io.Reader, extensions uint16) NodeIdHandshake {
+func ReadNodeIdHandshake(r io.Reader, extensions Extensions) NodeIdHandshake {
 	println("received NodeIdHandshake message")
 	nodeIdHandshake := NodeIdHandshake{}
 
@@ -36,8 +36,8 @@ func ReadNodeIdHandshake(r io.Reader, extensions uint16) NodeIdHandshake {
 	return nodeIdHandshake
 }
 
-func (n *NodeIdHandshake) Extensions() uint16 {
-	var extensions uint16
+func (n *NodeIdHandshake) Extensions() Extensions {
+	var extensions Extensions
 
 	if n.NodeIdQuery != nil {
 		extensions |= 1

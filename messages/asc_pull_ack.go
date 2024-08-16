@@ -25,7 +25,7 @@ func (f *Frontier) IsZero() bool {
 	return f.Account == [32]byte{} || f.Hash == [32]byte{}
 }
 
-func ReadAscPullAck(r io.Reader, extensions uint16) AscPullAck {
+func ReadAscPullAck(r io.Reader, extensions Extensions) AscPullAck {
 	println("received ReadAscPullAck")
 	type Header struct {
 		Type byte

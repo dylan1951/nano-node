@@ -9,6 +9,6 @@ func main() {
 	config.Load()
 	n := node.NewNode()
 	n.Connect()
-	go n.Bootstrap()
+	//go n.Bootstrap()
 	n.Listen()
 }

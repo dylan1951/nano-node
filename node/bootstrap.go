@@ -1,17 +1,13 @@
 package node
 
 import (
-	"encoding/hex"
-	"fmt"
-	"node/store"
 	"node/types"
-	"time"
 )
 
 var outdatedAccounts []types.PublicKey
 
 func (n *Node) Bootstrap() {
-	for _, p := range n.peers {
+	/*for _, p := range n.peers {
 		start := [32]byte{}
 
 		for {
@@ -42,7 +38,7 @@ func (n *Node) Bootstrap() {
 		fmt.Printf("there are %v outdated accounts\n", len(outdatedAccounts))
 
 		return
-	}
+	}*/
 }
 
 func (n *Node) scanAccounts() {

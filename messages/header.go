@@ -6,17 +6,7 @@ import (
 	"node/utils"
 )
 
-type Type byte
-
-const (
-	MsgNodeIdHandshake Type = 0x0a
-	MsgConfirmReq      Type = 0x04
-	MsgKeepAlive       Type = 0x02
-	MsgTelemetryReq    Type = 0x0c
-	MsgTelemetryAck    Type = 0x0d
-	MsgAscPullReq      Type = 0x0e
-	MsgAscPullAck      Type = 0x0f
-)
+type Extensions uint16
 
 type Header struct {
 	Magic        byte
@@ -25,10 +15,22 @@ type Header struct {
 	VersionUsing uint8
 	VersionMin   uint8
 	MessageType  Type
-	Extensions   uint16
+	Extensions   Extensions
 }
 
-func NewHeader(messageType Type, extensions uint16) *Header {
+func (e Extensions) ItemCount() int {
+	var isV2 = (e & 1) != 0
+
+	if isV2 {
+		left := (e & 0xf000) >> 12
+		right := (e & 0x00f0) >> 4
+		return int((left << 4) | right)
+	} else {
+		return int((e & 0xf000) >> 12)
+	}
+}
+
+func NewHeader(messageType Type, extensions Extensions) *Header {
 	return &Header{
 		Magic:        'R',
 		Network:      config.Network.Id,

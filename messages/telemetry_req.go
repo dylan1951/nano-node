@@ -4,7 +4,7 @@ import "io"
 
 type TelemetryReq struct{}
 
-func ReadTelemetryReq(reader io.Reader, extensions uint16) *TelemetryReq {
+func ReadTelemetryReq(reader io.Reader, extensions Extensions) *TelemetryReq {
 	println("received ReadTelemetryReq")
 	return nil
 }

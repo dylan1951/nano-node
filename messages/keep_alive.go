@@ -1,29 +1,22 @@
 package messages
 
 import (
-	"encoding/binary"
 	"io"
-	"log"
+	"net/netip"
 )
 
-type KeepAlive []*Socket
+type KeepAlive [8]netip.AddrPort
 
-type Socket struct {
-	Address [16]byte
-	Port    uint16
-}
+func ReadKeepAlive(r io.Reader, extensions Extensions) KeepAlive {
+	println("received keepalive")
+	var ka KeepAlive
+	buf := make([]byte, 18)
 
-func ReadKeepAlive(reader io.Reader, extensions uint16) *KeepAlive {
-	println("received keep alive")
-	peers := make(KeepAlive, 8)
-
-	for i := 0; i < 8; i++ {
-		socket := &Socket{}
-		if err := binary.Read(reader, binary.LittleEndian, socket); err != nil {
-			log.Fatalf("Error reading hash pair: %v", err)
-		}
-		peers = append(peers, socket)
+	for i := range ka {
+		_, _ = io.ReadFull(r, buf)
+		_ = ka[i].UnmarshalBinary(buf)
+		//fmt.Printf("found peer: %s, %s\n", hex.EncodeToString(buf), ka[i].String())
 	}
 
-	return &peers
+	return ka
 }

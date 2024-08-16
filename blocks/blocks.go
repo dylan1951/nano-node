@@ -45,33 +45,29 @@ type Block interface {
 	Type() Type
 }
 
-func Read(reader io.Reader) Block {
+func Read(r io.Reader) Block {
 	var blockType Type
 
-	if err := binary.Read(reader, binary.BigEndian, &blockType); err != nil {
+	if err := binary.Read(r, binary.BigEndian, &blockType); err != nil {
 		log.Fatalf("Failed to read block type: %v", err)
 	}
 
-	var block Block
-
 	switch blockType {
 	case Open:
-		block = utils.Read[OpenBlock](reader, binary.LittleEndian)
+		return utils.Read[OpenBlock](r, binary.LittleEndian)
 	case Send:
-		block = utils.Read[SendBlock](reader, binary.LittleEndian)
+		return utils.Read[SendBlock](r, binary.LittleEndian)
 	case Receive:
-		block = utils.Read[ReceiveBlock](reader, binary.LittleEndian)
+		return utils.Read[ReceiveBlock](r, binary.LittleEndian)
 	case Change:
-		block = utils.Read[ChangeBlock](reader, binary.LittleEndian)
+		return utils.Read[ChangeBlock](r, binary.LittleEndian)
 	case State:
-		block = utils.Read[StateBlock](reader, binary.BigEndian)
-	case NotABlock:
-		return nil
+		return utils.Read[StateBlock](r, binary.BigEndian)
 	default:
 		log.Fatalf("Unknown block type: %v", blockType)
 	}
 
-	return block
+	return nil
 }
 
 func Deserialize(serialized []byte) Block {

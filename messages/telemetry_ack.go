@@ -28,7 +28,7 @@ type TelemetryAck struct {
 	ActiveDifficulty  uint64
 }
 
-func ReadTelemetryAck(reader io.Reader, extensions uint16) *TelemetryAck {
+func ReadTelemetryAck(reader io.Reader, extensions Extensions) *TelemetryAck {
 	println("received ReadTelemetryAck")
 	return utils.Read[TelemetryAck](reader, binary.BigEndian)
 }

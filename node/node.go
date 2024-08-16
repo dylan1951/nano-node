@@ -4,16 +4,19 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/netip"
 	"node/config"
-	"node/peer"
+	"sync"
 )
 
 type Node struct {
-	peers []*peer.Peer
+	peers map[netip.Addr]*Peer
+	mu    sync.Mutex
 }
 
 func NewNode() *Node {
 	node := &Node{}
+	node.peers = make(map[netip.Addr]*Peer)
 	return node
 }
 
@@ -23,20 +26,30 @@ func (n *Node) Connect() {
 		log.Fatalf("Could not get IPs: %v\n", err)
 	}
 	for _, ip := range ips {
-		address := fmt.Sprintf("%s:%d", ip.String(), config.Network.Port)
-		n.connectPeer(address)
-		break
+		addr, _ := netip.AddrFromSlice(ip)
+		addrPort := netip.AddrPortFrom(addr, config.Network.Port)
+		n.connectPeer(addrPort)
 	}
 }
 
-func (n *Node) connectPeer(address string) {
-	fmt.Printf("Connecting to %s\n", address)
-	conn, err := net.Dial("tcp", address)
-	if err != nil {
-		log.Fatalf("Error: %v\n", err)
+func (n *Node) connectPeer(addr netip.AddrPort) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if addr.Addr().IsUnspecified() {
+		return
 	}
-	fmt.Println("Connected")
-	n.peers = append(n.peers, peer.NewPeer(conn, true))
+	if _, ok := n.peers[addr.Addr()]; ok {
+		fmt.Printf("Already connected to %s\n", addr.String())
+		return
+	}
+	fmt.Printf("Connecting to %s\n", addr.String())
+	conn, err := net.Dial("tcp", addr.String())
+	if err != nil {
+		log.Printf("Error: %v\n", err)
+		return
+	}
+	fmt.Printf("Connected to %s\n", addr.String())
+	n.peers[addr.Addr()] = NewPeer(conn, n, true)
 }
 
 func (n *Node) Listen() {
@@ -48,9 +61,11 @@ func (n *Node) Listen() {
 	defer l.Close()
 	for {
 		conn, err := l.Accept()
+		addr, _ := conn.RemoteAddr().(*net.TCPAddr)
+
 		if err != nil {
 			log.Fatalf("Error accepting: %v", err.Error())
 		}
-		n.peers = append(n.peers, peer.NewPeer(conn, false))
+		n.peers[addr.AddrPort().Addr()] = NewPeer(conn, n, false)
 	}
 }

@@ -7,6 +7,19 @@ import (
 	"node/config"
 )
 
+type Type byte
+
+const (
+	MsgNodeIdHandshake Type = 0x0a
+	MsgConfirmReq      Type = 0x04
+	MsgConfirmAck      Type = 0x05
+	MsgKeepAlive       Type = 0x02
+	MsgTelemetryReq    Type = 0x0c
+	MsgTelemetryAck    Type = 0x0d
+	MsgAscPullReq      Type = 0x0e
+	MsgAscPullAck      Type = 0x0f
+)
+
 type Message interface{}
 
 func Read(reader io.Reader) Message {
@@ -40,6 +53,8 @@ func Read(reader io.Reader) Message {
 		return ReadTelemetryReq(reader, header.Extensions)
 	case MsgTelemetryAck:
 		return ReadTelemetryAck(reader, header.Extensions)
+	case MsgConfirmAck:
+		return ReadConfirmAck(reader, header.Extensions)
 	default:
 		log.Fatalf("Unknown message type: 0x%x", header.MessageType)
 	}

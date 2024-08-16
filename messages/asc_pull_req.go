@@ -23,7 +23,7 @@ type AscPullReqHeader struct {
 
 type AscPullReq struct{}
 
-func ReadAscPullReq(reader io.Reader, extensions uint16) *AscPullReq {
+func ReadAscPullReq(reader io.Reader, extensions Extensions) *AscPullReq {
 	println("received ReadAscPullReq")
 	header := &AscPullReqHeader{}
 	if err := binary.Read(reader, binary.BigEndian, header); err != nil {
