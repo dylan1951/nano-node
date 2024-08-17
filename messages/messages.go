@@ -18,6 +18,7 @@ const (
 	MsgTelemetryAck    Type = 0x0d
 	MsgAscPullReq      Type = 0x0e
 	MsgAscPullAck      Type = 0x0f
+	MsgPublish         Type = 0x03
 )
 
 type Message interface{}
@@ -25,15 +26,15 @@ type Message interface{}
 func Read(reader io.Reader) Message {
 	header := &Header{}
 	if err := binary.Read(reader, binary.LittleEndian, header); err != nil {
-		log.Fatalf("Error reading message header: %v\n", err)
+		panic("Error reading message header")
 	}
 
 	if header.Magic != 'R' || header.Network != config.Network.Id {
-		log.Fatalf("Invalid message header")
+		panic("Invalid message header")
 	}
 
-	if header.VersionMax < 20 {
-		log.Fatalf("Protocol version too low")
+	if header.VersionMax < config.ProtocolVersionMin {
+		panic("Protocol version too low")
 	}
 
 	//fmt.Printf("Received message header: %+v\n", header)
@@ -55,6 +56,8 @@ func Read(reader io.Reader) Message {
 		return ReadTelemetryAck(reader, header.Extensions)
 	case MsgConfirmAck:
 		return ReadConfirmAck(reader, header.Extensions)
+	case MsgPublish:
+		return ReadPublish(reader, header.Extensions)
 	default:
 		log.Fatalf("Unknown message type: 0x%x", header.MessageType)
 	}

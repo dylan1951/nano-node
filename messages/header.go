@@ -34,9 +34,9 @@ func NewHeader(messageType Type, extensions Extensions) *Header {
 	return &Header{
 		Magic:        'R',
 		Network:      config.Network.Id,
-		VersionMax:   20,
-		VersionUsing: 20,
-		VersionMin:   20,
+		VersionMax:   config.ProtocolVersionMax,
+		VersionUsing: config.ProtocolVersionUsing,
+		VersionMin:   config.ProtocolVersionMin,
 		MessageType:  messageType,
 		Extensions:   extensions,
 	}

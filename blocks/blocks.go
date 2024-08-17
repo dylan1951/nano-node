@@ -3,13 +3,14 @@ package blocks
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 	"node/types"
 	"node/utils"
 )
 
-type Type byte
+type Type uint8
 
 const (
 	NotABlock Type = 1
@@ -64,7 +65,7 @@ func Read(r io.Reader) Block {
 	case State:
 		return utils.Read[StateBlock](r, binary.BigEndian)
 	default:
-		log.Fatalf("Unknown block type: %v", blockType)
+		panic(fmt.Sprintf("Unknown block type: %d", blockType))
 	}
 
 	return nil

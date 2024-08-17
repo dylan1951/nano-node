@@ -12,6 +12,10 @@ var PrivateKey ed25519.PrivateKey
 var PublicKey ed25519.PublicKey
 var Network NetworkDetail
 
+var ProtocolVersionMax = uint8(21)
+var ProtocolVersionUsing = uint8(21)
+var ProtocolVersionMin = uint8(20)
+
 type NetworkDetail struct {
 	Id      byte
 	Address string

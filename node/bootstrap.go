@@ -7,10 +7,13 @@ import (
 var outdatedAccounts []types.PublicKey
 
 func (n *Node) Bootstrap() {
-	/*for _, p := range n.peers {
-		start := [32]byte{}
 
-		for {
+}
+
+func (n *Node) scanAccounts() {
+	//start := [32]byte{}
+
+	/*	for {
 			fmt.Printf("requesting frontiers from: %+v\n", hex.EncodeToString(start[:]))
 			frontiers := <-p.RequestFrontiers(start)
 
@@ -35,12 +38,5 @@ func (n *Node) Bootstrap() {
 			time.Sleep(500 * time.Millisecond)
 		}
 
-		fmt.Printf("there are %v outdated accounts\n", len(outdatedAccounts))
-
-		return
-	}*/
-}
-
-func (n *Node) scanAccounts() {
-
+		fmt.Printf("there are %v outdated accounts\n", len(outdatedAccounts))*/
 }

@@ -8,27 +8,31 @@ import (
 )
 
 type TelemetryAck struct {
-	Signature         types.Signature
+	Signature types.Signature
+	TelemetryData
+}
+
+type TelemetryData struct {
 	NodeId            types.PublicKey
 	BlockCount        uint64
 	CementedCount     uint64
 	UncheckedCount    uint64
 	AccountCount      uint64
-	BandwidthCap      uint64
+	BandwidthCap      uint64 // bits per second? 0 is unlimited
 	PeerCount         uint32
 	ProtocolVersion   uint8
-	Uptime            uint64
+	Uptime            uint64 // seconds since started?
 	GenesisBlock      types.Hash
 	MajorVersion      byte
 	MinorVersion      byte
 	PatchVersion      byte
 	PrereleaseVersion byte
-	Maker             byte
-	Timestamp         uint64
+	Maker             byte   // ???
+	Timestamp         uint64 // current unix epoch in milliseconds?
 	ActiveDifficulty  uint64
 }
 
-func ReadTelemetryAck(reader io.Reader, extensions Extensions) *TelemetryAck {
-	println("received ReadTelemetryAck")
-	return utils.Read[TelemetryAck](reader, binary.BigEndian)
+func ReadTelemetryAck(r io.Reader, extensions Extensions) TelemetryAck {
+	println("received telemetry ack")
+	return *utils.Read[TelemetryAck](r, binary.BigEndian)
 }

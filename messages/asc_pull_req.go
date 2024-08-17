@@ -3,7 +3,6 @@ package messages
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"log"
 	"node/utils"
@@ -24,7 +23,7 @@ type AscPullReqHeader struct {
 type AscPullReq struct{}
 
 func ReadAscPullReq(reader io.Reader, extensions Extensions) *AscPullReq {
-	println("received ReadAscPullReq")
+	println("received AscPullReq")
 	header := &AscPullReqHeader{}
 	if err := binary.Read(reader, binary.BigEndian, header); err != nil {
 		log.Fatalf("Error reading AscPullReq header: %v", err)
@@ -36,9 +35,9 @@ func ReadAscPullReq(reader io.Reader, extensions Extensions) *AscPullReq {
 		if err := binary.Read(reader, binary.BigEndian, payload); err != nil {
 			log.Fatalf("Error reading Blocks payload: %v", err)
 		}
-		fmt.Printf("Start: %v\n", payload.Start)
-		fmt.Printf("Count: %d\n", payload.Count)
-		fmt.Printf("StartType: %v\n", payload.StartType)
+		//fmt.Printf("Start: %v\n", payload.Start)
+		//fmt.Printf("Count: %d\n", payload.Count)
+		//fmt.Printf("StartType: %v\n", payload.StartType)
 	case AccountInfo:
 	case Frontiers:
 	default:
