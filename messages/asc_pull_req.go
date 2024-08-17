@@ -22,7 +22,7 @@ type AscPullReqHeader struct {
 
 type AscPullReq struct{}
 
-func ReadAscPullReq(reader io.Reader, extensions Extensions) *AscPullReq {
+func ReadAscPullReq(reader io.Reader, extensions Extensions) AscPullReq {
 	header := &AscPullReqHeader{}
 	if err := binary.Read(reader, binary.BigEndian, header); err != nil {
 		log.Fatalf("Error reading AscPullReq header: %v", err)
@@ -43,7 +43,7 @@ func ReadAscPullReq(reader io.Reader, extensions Extensions) *AscPullReq {
 		log.Fatalf("Unknown AscPullReq type: %x", header.Type)
 	}
 
-	return &AscPullReq{}
+	return AscPullReq{}
 }
 
 type HashType byte

@@ -12,8 +12,8 @@ type ConfirmAck struct {
 	Hashes    [][32]byte
 }
 
-func ReadConfirmAck(r io.Reader, extensions Extensions) *ConfirmAck {
-	confirmAck := &ConfirmAck{}
+func ReadConfirmAck(r io.Reader, extensions Extensions) ConfirmAck {
+	confirmAck := ConfirmAck{}
 
 	confirmAck.Account = *utils.Read[[32]byte](r, binary.LittleEndian)
 	confirmAck.Signature = *utils.Read[[64]byte](r, binary.LittleEndian)

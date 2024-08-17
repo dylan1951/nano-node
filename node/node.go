@@ -31,7 +31,6 @@ func connectPeer(addr netip.AddrPort) {
 	mu.Lock()
 	defer mu.Unlock()
 	if _, ok := peers[addr.Addr().As16()]; ok {
-		//fmt.Printf("Already connected to %s\n", addr.Addr().String())
 		return
 	}
 	conn, err := net.DialTimeout("tcp", addr.String(), 5*time.Second)

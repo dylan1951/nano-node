@@ -18,17 +18,17 @@ type TelemetryData struct {
 	CementedCount     uint64
 	UncheckedCount    uint64
 	AccountCount      uint64
-	BandwidthCap      uint64 // bits per second? 0 is unlimited
+	BandwidthCap      uint64 // bits per second. 0 is unlimited
 	PeerCount         uint32
 	ProtocolVersion   uint8
-	Uptime            uint64 // seconds since started?
+	Uptime            uint64 // seconds since started
 	GenesisBlock      types.Hash
 	MajorVersion      byte
 	MinorVersion      byte
 	PatchVersion      byte
 	PrereleaseVersion byte
-	Maker             byte   // ???
-	Timestamp         uint64 // current unix epoch in milliseconds?
+	Maker             byte   // implementation identifier
+	Timestamp         uint64 // current unix epoch in milliseconds
 	ActiveDifficulty  uint64
 }
 
