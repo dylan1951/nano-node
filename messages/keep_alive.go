@@ -8,7 +8,6 @@ import (
 type KeepAlive [8]netip.AddrPort
 
 func ReadKeepAlive(r io.Reader, extensions Extensions) KeepAlive {
-	println("received keepalive")
 	var ka KeepAlive
 	buf := make([]byte, 18)
 

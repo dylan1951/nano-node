@@ -14,8 +14,6 @@ type HashPair struct {
 }
 
 func ReadConfirmReq(r io.Reader, extensions Extensions) *ConfirmReq {
-	println("received confirm req")
-
 	for i := 0; i < extensions.ItemCount(); i++ {
 		pair := &HashPair{}
 		if err := binary.Read(r, binary.LittleEndian, pair); err != nil {

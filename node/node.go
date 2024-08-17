@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-var peers = make(map[netip.Addr]*Peer)
+var peers = make(map[[16]byte]*Peer)
 var mu sync.Mutex
 var startTime = time.Now()
 
@@ -30,18 +30,19 @@ func Connect() {
 func connectPeer(addr netip.AddrPort) {
 	mu.Lock()
 	defer mu.Unlock()
-	if _, ok := peers[addr.Addr()]; ok {
-		fmt.Printf("Already connected to %s\n", addr.String())
+	if _, ok := peers[addr.Addr().As16()]; ok {
+		//fmt.Printf("Already connected to %s\n", addr.Addr().String())
 		return
 	}
-	conn, err := net.DialTimeout("tcp", addr.String(), 2*time.Second)
+	conn, err := net.DialTimeout("tcp", addr.String(), 5*time.Second)
 	if err != nil {
 		log.Printf("Error: %v\n", err)
+		peers[addr.Addr().As16()] = nil
 		return
 	}
-	fmt.Printf("Connected to %s\n", addr.String())
+	fmt.Printf("Discovered peer %s. There's now %d live peers.\n", addr.String(), countLivePeers())
 	peer := NewPeer(conn)
-	peers[peer.Addr()] = peer
+	peers[addr.Addr().As16()] = peer
 	go peer.handleMessages()
 	peer.handleNodeIdHandshake(messages.NodeIdHandshake{})
 }
@@ -59,12 +60,12 @@ func Listen() {
 			log.Fatalf("Error accepting: %v", err.Error())
 		}
 		peer := NewPeer(conn)
-		peers[peer.Addr()] = peer
+		peers[peer.AddrPort().Addr().As16()] = peer
 		go peer.handleMessages()
 	}
 }
 
-func countAlivePeers() (count uint32) {
+func countLivePeers() (count uint32) {
 	for _, value := range peers {
 		if value != nil {
 			count++
@@ -81,7 +82,7 @@ func Telemetry() messages.TelemetryData {
 		UncheckedCount:    0,
 		AccountCount:      0,
 		BandwidthCap:      0,
-		PeerCount:         countAlivePeers(),
+		PeerCount:         countLivePeers(),
 		ProtocolVersion:   config.ProtocolVersionUsing,
 		Uptime:            uint64(time.Since(startTime).Seconds()),
 		GenesisBlock:      config.Network.Genesis.Hash(),
@@ -91,6 +92,6 @@ func Telemetry() messages.TelemetryData {
 		PrereleaseVersion: 0,
 		Maker:             69,
 		Timestamp:         uint64(time.Now().UnixMilli()),
-		ActiveDifficulty:  0xFFFFF00000000000,
+		ActiveDifficulty:  config.ActiveDifficulty,
 	}
 }

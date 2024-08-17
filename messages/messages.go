@@ -37,8 +37,6 @@ func Read(reader io.Reader) Message {
 		panic("Protocol version too low")
 	}
 
-	//fmt.Printf("Received message header: %+v\n", header)
-
 	switch header.MessageType {
 	case MsgNodeIdHandshake:
 		return ReadNodeIdHandshake(reader, header.Extensions)

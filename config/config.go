@@ -19,6 +19,8 @@ var ProtocolVersionMax = uint8(21)
 var ProtocolVersionUsing = uint8(21)
 var ProtocolVersionMin = uint8(20)
 
+var ActiveDifficulty = uint64(0xFFFFF00000000000)
+
 type NetworkDetail struct {
 	Id      byte
 	Address string

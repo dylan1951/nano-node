@@ -22,7 +22,6 @@ type NodeIdHandshake struct {
 }
 
 func ReadNodeIdHandshake(r io.Reader, extensions Extensions) NodeIdHandshake {
-	println("received NodeIdHandshake message")
 	nodeIdHandshake := NodeIdHandshake{}
 
 	if (extensions & 1) != 0 {

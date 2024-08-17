@@ -26,7 +26,6 @@ func (f *Frontier) IsZero() bool {
 }
 
 func ReadAscPullAck(r io.Reader, extensions Extensions) AscPullAck {
-	println("received ReadAscPullAck")
 	type Header struct {
 		Type byte
 		Id   uint64

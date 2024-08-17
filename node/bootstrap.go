@@ -6,11 +6,11 @@ import (
 
 var outdatedAccounts []types.PublicKey
 
-func (n *Node) Bootstrap() {
+func Bootstrap() {
 
 }
 
-func (n *Node) scanAccounts() {
+func scanAccounts() {
 	//start := [32]byte{}
 
 	/*	for {

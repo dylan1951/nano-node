@@ -33,6 +33,5 @@ type TelemetryData struct {
 }
 
 func ReadTelemetryAck(r io.Reader, extensions Extensions) TelemetryAck {
-	println("received telemetry ack")
 	return *utils.Read[TelemetryAck](r, binary.BigEndian)
 }
