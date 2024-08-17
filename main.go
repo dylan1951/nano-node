@@ -7,8 +7,6 @@ import (
 
 func main() {
 	config.Load()
-	n := node.NewNode()
-	n.Connect()
-	//go n.Bootstrap()
-	n.Listen()
+	node.Connect()
+	node.Listen()
 }

@@ -5,29 +5,17 @@ import (
 	"log"
 	"net"
 	"net/netip"
-	"node/blocks"
 	"node/config"
 	"node/messages"
 	"sync"
 	"time"
 )
 
-type Node struct {
-	peers     map[netip.Addr]*Peer
-	mu        sync.Mutex
-	startTime time.Time
-}
+var peers = make(map[netip.Addr]*Peer)
+var mu sync.Mutex
+var startTime = time.Now()
 
-func NewNode() *Node {
-	node := &Node{}
-	node.peers = make(map[netip.Addr]*Peer)
-	node.startTime = time.Now()
-	telemetry := node.Telemetry()
-	fmt.Printf("%+v\n", telemetry)
-	return node
-}
-
-func (n *Node) Connect() {
+func Connect() {
 	ips, err := net.LookupIP(config.Network.Address)
 	if err != nil {
 		log.Fatalf("Could not get IPs: %v\n", err)
@@ -35,17 +23,14 @@ func (n *Node) Connect() {
 	for _, ip := range ips {
 		addr, _ := netip.AddrFromSlice(ip)
 		addrPort := netip.AddrPortFrom(addr, config.Network.Port)
-		n.connectPeer(addrPort)
+		connectPeer(addrPort)
 	}
 }
 
-func (n *Node) connectPeer(addr netip.AddrPort) {
-	if addr.Addr().IsUnspecified() {
-		return
-	}
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	if _, ok := n.peers[addr.Addr()]; ok {
+func connectPeer(addr netip.AddrPort) {
+	mu.Lock()
+	defer mu.Unlock()
+	if _, ok := peers[addr.Addr()]; ok {
 		fmt.Printf("Already connected to %s\n", addr.String())
 		return
 	}
@@ -55,10 +40,13 @@ func (n *Node) connectPeer(addr netip.AddrPort) {
 		return
 	}
 	fmt.Printf("Connected to %s\n", addr.String())
-	n.peers[addr.Addr()] = NewPeer(conn, n, true)
+	peer := NewPeer(conn)
+	peers[peer.Addr()] = peer
+	go peer.handleMessages()
+	peer.handleNodeIdHandshake(messages.NodeIdHandshake{})
 }
 
-func (n *Node) Listen() {
+func Listen() {
 	address := fmt.Sprintf("%s:%d", net.IPv4zero.String(), config.Network.Port)
 	l, err := net.Listen("tcp", address)
 	if err != nil {
@@ -67,16 +55,25 @@ func (n *Node) Listen() {
 	defer l.Close()
 	for {
 		conn, err := l.Accept()
-		addr, _ := conn.RemoteAddr().(*net.TCPAddr)
-
 		if err != nil {
 			log.Fatalf("Error accepting: %v", err.Error())
 		}
-		n.peers[addr.AddrPort().Addr()] = NewPeer(conn, n, false)
+		peer := NewPeer(conn)
+		peers[peer.Addr()] = peer
+		go peer.handleMessages()
 	}
 }
 
-func (n *Node) Telemetry() messages.TelemetryData {
+func countAlivePeers() (count uint32) {
+	for _, value := range peers {
+		if value != nil {
+			count++
+		}
+	}
+	return
+}
+
+func Telemetry() messages.TelemetryData {
 	return messages.TelemetryData{
 		NodeId:            [32]byte(config.PublicKey),
 		BlockCount:        0,
@@ -84,15 +81,15 @@ func (n *Node) Telemetry() messages.TelemetryData {
 		UncheckedCount:    0,
 		AccountCount:      0,
 		BandwidthCap:      0,
-		PeerCount:         uint32(len(n.peers)),
+		PeerCount:         countAlivePeers(),
 		ProtocolVersion:   config.ProtocolVersionUsing,
-		Uptime:            uint64(time.Since(n.startTime).Seconds()),
-		GenesisBlock:      blocks.BetaGenesisBlock.Hash(),
+		Uptime:            uint64(time.Since(startTime).Seconds()),
+		GenesisBlock:      config.Network.Genesis.Hash(),
 		MajorVersion:      0,
 		MinorVersion:      0,
 		PatchVersion:      0,
 		PrereleaseVersion: 0,
-		Maker:             2,
+		Maker:             69,
 		Timestamp:         uint64(time.Now().UnixMilli()),
 		ActiveDifficulty:  0xFFFFF00000000000,
 	}
