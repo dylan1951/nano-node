@@ -87,7 +87,7 @@ func GetLastBlockHash() [32]byte {
 	}
 
 	if iter.Last() {
-		return *(*[32]byte)(iter.Key())
+		return [32]byte(iter.Key())
 	} else {
 		return [32]byte{}
 	}

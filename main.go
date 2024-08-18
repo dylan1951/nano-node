@@ -10,7 +10,8 @@ import (
 func main() {
 	config.Load()
 	address := utils.PubKeyToAddress(config.PublicKey, false)
-	log.Printf("representative address: %s\n", address)
+	log.Printf("Node ID: %s\n", address)
 	node.Connect()
+	node.Bootstrap()
 	node.Listen()
 }

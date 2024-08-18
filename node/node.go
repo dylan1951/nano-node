@@ -33,17 +33,17 @@ func connectPeer(addr netip.AddrPort) {
 	if _, ok := peers[addr.Addr().As16()]; ok {
 		return
 	}
-	conn, err := net.DialTimeout("tcp", addr.String(), 5*time.Second)
+	conn, err := net.DialTimeout("tcp", addr.String(), 2*time.Second)
 	if err != nil {
 		log.Printf("Error: %v\n", err)
 		peers[addr.Addr().As16()] = nil
 		return
 	}
-	fmt.Printf("Discovered peer %s. There's now %d live peers.\n", addr.String(), countLivePeers())
 	peer := NewPeer(conn)
 	peers[addr.Addr().As16()] = peer
 	go peer.handleMessages()
 	peer.handleNodeIdHandshake(messages.NodeIdHandshake{})
+	fmt.Printf("Discovered peer %s. There's now %d live peers.\n", addr.String(), countLivePeers())
 }
 
 func Listen() {

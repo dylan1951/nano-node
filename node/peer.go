@@ -17,16 +17,18 @@ import (
 )
 
 type Peer struct {
-	Id     ed25519.PublicKey
-	cookie []byte
-	conn   net.Conn
-	mu     sync.Mutex
+	Id            ed25519.PublicKey
+	cookie        []byte
+	conn          net.Conn
+	mu            sync.Mutex
+	frontiersChan chan []*messages.Frontier
 }
 
 func NewPeer(conn net.Conn) *Peer {
 	p := new(Peer)
 	p.conn = conn
 	p.cookie = make([]byte, 32)
+	p.frontiersChan = make(chan []*messages.Frontier)
 	p.mu.Lock()
 
 	if _, err := rand.Read(p.cookie); err != nil {
@@ -34,6 +36,13 @@ func NewPeer(conn net.Conn) *Peer {
 	}
 
 	return p
+}
+
+func (p *Peer) RequestFrontiers(start [32]byte, count uint16) chan []*messages.Frontier {
+	p.mu.Lock()
+	frontiersReq := messages.FrontiersRequest(start, count)
+	p.conn.Write(frontiersReq)
+	return p.frontiersChan
 }
 
 func (p *Peer) handleMessages() {
@@ -55,8 +64,21 @@ func (p *Peer) handleMessages() {
 			p.handleTelemetryReq(v)
 		case messages.TelemetryAck:
 			p.handleTelemetryAck(v)
+		case messages.AscPullAck:
+			p.handleAscPullAck(v)
 		}
 	}
+}
+
+func (p *Peer) handleAscPullAck(msg messages.AscPullAck) {
+	if len(msg.Blocks) > 0 {
+		// TODO: implement
+	} else if len(msg.Frontiers) > 0 {
+		p.frontiersChan <- msg.Frontiers
+	} else {
+		log.Fatalf("Empty AscPullAck message")
+	}
+	p.mu.Unlock()
 }
 
 func (p *Peer) handleTelemetryAck(msg messages.TelemetryAck) {
