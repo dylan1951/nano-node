@@ -8,6 +8,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"log"
 	"node/blocks"
+	"node/types"
 	"node/utils"
 )
 
@@ -19,7 +20,9 @@ const (
 )
 
 type Account struct {
-	Frontier [32]byte
+	Frontier       types.Hash
+	Representative types.PublicKey
+	Balance        [16]byte
 }
 
 func SetAccount(publicKey [32]byte, account Account) {
@@ -68,7 +71,7 @@ func GetBlock(blockHash [32]byte) blocks.Block {
 	serialized, closer, err := db.Get(blockHash[:])
 
 	if err != nil {
-		log.Fatal(err)
+		return nil
 	}
 
 	if err := closer.Close(); err != nil {

@@ -6,14 +6,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"golang.org/x/crypto/blake2b"
+	"node/types"
 	"node/utils"
 )
 
 type ChangeBlock struct {
 	Previous       [32]byte
 	Representative [32]byte
-	Signature      [64]byte
-	Work           uint64
+	BlockCommon
 }
 
 func (b *ChangeBlock) Print() {
@@ -23,7 +23,7 @@ func (b *ChangeBlock) Print() {
 	fmt.Printf("Work:           %x\n", b.Work)
 }
 
-func (b *ChangeBlock) Hash() [32]byte {
+func (b *ChangeBlock) Hash() types.Hash {
 	var buf bytes.Buffer
 	buf.Write(b.Previous[:])
 	buf.Write(b.Representative[:])
@@ -31,9 +31,9 @@ func (b *ChangeBlock) Hash() [32]byte {
 }
 
 func (b *ChangeBlock) Serialize() []byte {
-	return append([]byte{byte(Change)}, utils.Serialize(b, binary.LittleEndian)...)
+	return append([]byte{byte(LegacyChange)}, utils.Serialize(b, binary.LittleEndian)...)
 }
 
 func (b *ChangeBlock) Type() Type {
-	return Change
+	return LegacyChange
 }

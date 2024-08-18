@@ -75,12 +75,12 @@ func ParseAddress(s string) (Address, error) {
 	return address, nil
 }
 
-func MustParseAddress(s string) Address {
+func MustParseAddress(s string) PublicKey {
 	addr, err := ParseAddress(s)
 	if err != nil {
 		log.Fatalf("failed to parse address: %v", err)
 	}
-	return addr
+	return PublicKey(addr)
 }
 
 // Checksum calculates the checksum for this address' public key.

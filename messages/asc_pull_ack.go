@@ -36,7 +36,7 @@ func ReadAscPullAck(r io.Reader, extensions Extensions) AscPullAck {
 
 	switch header.Type {
 	case Blocks:
-		ack.Blocks = make([]*blocks.Block, 1024)
+		ack.Blocks = make([]*blocks.Block, 0)
 
 		for b := blocks.Read(r); b != nil; b = blocks.Read(r) {
 			hash := b.Hash()

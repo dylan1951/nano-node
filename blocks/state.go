@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"golang.org/x/crypto/blake2b"
+	"node/types"
 	"node/utils"
 )
 
@@ -15,11 +16,10 @@ type StateBlock struct {
 	Representative [32]byte
 	Balance        [16]byte
 	Link           [32]byte
-	Signature      [64]byte
-	Work           uint64
+	BlockCommon
 }
 
-func (b *StateBlock) Hash() [32]byte {
+func (b *StateBlock) Hash() types.Hash {
 	preamble := [32]byte{31: byte(State)}
 	var buf bytes.Buffer
 	buf.Grow(176)

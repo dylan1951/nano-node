@@ -6,18 +6,18 @@ import (
 	"encoding/hex"
 	"fmt"
 	"golang.org/x/crypto/blake2b"
+	"node/types"
 	"node/utils"
 )
 
 type OpenBlock struct {
-	Source         [32]byte
-	Representative [32]byte
-	Account        [32]byte
-	Signature      [64]byte
-	Work           uint64
+	Source         types.Hash
+	Representative types.PublicKey
+	Account        types.PublicKey
+	BlockCommon
 }
 
-func (b *OpenBlock) Hash() [32]byte {
+func (b *OpenBlock) Hash() types.Hash {
 	var buf bytes.Buffer
 	buf.Write(b.Source[:])
 	buf.Write(b.Representative[:])
@@ -34,9 +34,9 @@ func (b *OpenBlock) Print() {
 }
 
 func (b *OpenBlock) Serialize() []byte {
-	return append([]byte{byte(Open)}, utils.Serialize(b, binary.LittleEndian)...)
+	return append([]byte{byte(LegacyOpen)}, utils.Serialize(b, binary.LittleEndian)...)
 }
 
 func (b *OpenBlock) Type() Type {
-	return Open
+	return LegacyOpen
 }
