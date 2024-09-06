@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"golang.org/x/crypto/blake2b"
+	"io"
 	"node/types"
 	"node/utils"
 )
@@ -25,10 +26,18 @@ func (b *OpenBlock) Hash() types.Hash {
 	return blake2b.Sum256(buf.Bytes())
 }
 
+func (b *OpenBlock) Read(r io.Reader) *OpenBlock {
+	io.ReadFull(r, b.Source[:])
+	io.ReadFull(r, b.Representative[:])
+	io.ReadFull(r, b.Account[:])
+	binary.Read(r, binary.LittleEndian, &b.BlockCommon)
+	return b
+}
+
 func (b *OpenBlock) Print() {
 	fmt.Printf("Source:         %s\n", hex.EncodeToString(b.Source[:]))
 	fmt.Printf("Representative: %s\n", hex.EncodeToString(b.Representative[:]))
-	fmt.Printf("Account:        %s\n", hex.EncodeToString(b.Account[:]))
+	fmt.Printf("AccountRecord:        %s\n", hex.EncodeToString(b.Account[:]))
 	fmt.Printf("Signature:      %s\n", hex.EncodeToString(b.Signature[:]))
 	fmt.Printf("Work:           %x\n", b.Work)
 }
@@ -39,4 +48,8 @@ func (b *OpenBlock) Serialize() []byte {
 
 func (b *OpenBlock) Type() Type {
 	return LegacyOpen
+}
+
+func (b *OpenBlock) GetPrevious() types.Hash {
+	return types.Hash{}
 }

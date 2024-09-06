@@ -47,7 +47,7 @@ func ReadAscPullAck(r io.Reader, extensions Extensions) AscPullAck {
 		ack.Frontiers = make([]*Frontier, 0)
 
 		for f := utils.Read[Frontier](r, binary.BigEndian); !f.IsZero(); f = utils.Read[Frontier](r, binary.BigEndian) {
-			//fmt.Printf("frontier for %s is %s\n", f.Account.GoString(), f.Hash.GoString())
+			//fmt.Printf("frontier for %s is %s\n", f.AccountRecord.GoString(), f.Hash.GoString())
 			ack.Frontiers = append(ack.Frontiers, f)
 		}
 	default:

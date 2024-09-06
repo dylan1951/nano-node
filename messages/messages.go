@@ -25,6 +25,7 @@ type Message interface{}
 
 func Read(reader io.Reader) Message {
 	header := &Header{}
+
 	if err := binary.Read(reader, binary.LittleEndian, header); err != nil {
 		panic("Error reading message header")
 	}

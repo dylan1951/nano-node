@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"node/types"
-	"node/utils"
 )
 
 type Type uint8
@@ -27,6 +26,7 @@ type Block interface {
 	Serialize() []byte
 	Type() Type
 	BlockCommon() *BlockCommon
+	GetPrevious() types.Hash
 }
 
 type BlockCommon struct {
@@ -47,15 +47,15 @@ func Read(r io.Reader) Block {
 
 	switch blockType {
 	case LegacyOpen:
-		return utils.Read[OpenBlock](r, binary.LittleEndian)
+		return (&OpenBlock{}).Read(r)
 	case LegacySend:
-		return utils.Read[SendBlock](r, binary.LittleEndian)
+		return (&SendBlock{}).Read(r)
 	case LegacyReceive:
-		return utils.Read[ReceiveBlock](r, binary.LittleEndian)
+		return (&ReceiveBlock{}).Read(r)
 	case LegacyChange:
-		return utils.Read[ChangeBlock](r, binary.LittleEndian)
+		return (&ChangeBlock{}).Read(r)
 	case State:
-		return utils.Read[StateBlock](r, binary.BigEndian)
+		return (&StateBlock{}).Read(r)
 	default:
 		panic(fmt.Sprintf("Unknown block type: %d", blockType))
 	}

@@ -12,6 +12,7 @@ func main() {
 	config.Load()
 	address := utils.PubKeyToAddress(config.PublicKey, false)
 	log.Printf("Node ID: %s\n", address)
+	ledger.Init()
 	go ledger.ProcessBlocks()
 	node.Connect()
 	go node.Bootstrap()

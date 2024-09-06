@@ -9,6 +9,7 @@ import (
 	"log"
 	"node/blocks"
 	"node/types"
+	"node/types/uint128"
 	"node/utils"
 )
 
@@ -19,19 +20,41 @@ const (
 	PrefixAccount
 )
 
-type Account struct {
-	Frontier       types.Hash
-	Representative types.PublicKey
-	Balance        [16]byte
+type BlockRecord struct {
+	Block      blocks.Block
+	Account    types.PublicKey
+	Receivable uint128.Uint128
 }
 
-func SetAccount(publicKey [32]byte, account Account) {
+type AccountRecord struct {
+	Frontier types.Hash
+	Balance  uint128.Uint128
+	Height   uint64
+}
+
+func (b *BlockRecord) Serialize() []byte {
+	return []byte{}
+}
+
+func (b *BlockRecord) Deserialize([]byte) {
+
+}
+
+func (a *AccountRecord) Serialize() []byte {
+	return []byte{}
+}
+
+func (a *AccountRecord) Deserialize([]byte) {
+
+}
+
+func SetAccount(publicKey [32]byte, account AccountRecord) {
 	if err := db.Set(publicKey[:], utils.Serialize(account, binary.LittleEndian), pebble.Sync); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func GetAccount(publicKey [32]byte) *Account {
+func GetAccount(publicKey types.PublicKey) *AccountRecord {
 	serialized, closer, err := db.Get(publicKey[:])
 
 	if err != nil {
@@ -42,7 +65,7 @@ func GetAccount(publicKey [32]byte) *Account {
 		log.Fatal(err)
 	}
 
-	return utils.Read[Account](bytes.NewReader(serialized), binary.LittleEndian)
+	return utils.Read[AccountRecord](bytes.NewReader(serialized), binary.LittleEndian)
 }
 
 func SetPull(hash [32]byte, val byte) {
@@ -57,17 +80,15 @@ func DeletePull(hash [32]byte) {
 	}
 }
 
-func PutBlock(block blocks.Block) {
-	blockHash := block.Hash()
-
-	if err := db.Set(blockHash[:], block.Serialize(), pebble.Sync); err != nil {
+func PutBlock(blockHash types.Hash, record BlockRecord) {
+	if err := db.Set(blockHash[:], record.Serialize(), pebble.Sync); err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Println("saved block:", hex.EncodeToString(blockHash[:]))
 }
 
-func GetBlock(blockHash [32]byte) blocks.Block {
+func GetBlock(blockHash [32]byte) *BlockRecord {
 	serialized, closer, err := db.Get(blockHash[:])
 
 	if err != nil {

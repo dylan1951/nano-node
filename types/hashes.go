@@ -13,6 +13,10 @@ func (h Hash) GoString() string {
 	return hex.EncodeToString(h[:])
 }
 
+func (h Hash) IsZero() bool {
+	return h == Hash{}
+}
+
 func (h Hash) MarshalJSON() ([]byte, error) {
 	jsonData, err := json.Marshal(h.GoString())
 	return jsonData, err

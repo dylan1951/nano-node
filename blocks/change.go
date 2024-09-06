@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"golang.org/x/crypto/blake2b"
+	"io"
 	"node/types"
 	"node/utils"
 )
@@ -23,6 +24,13 @@ func (b *ChangeBlock) Print() {
 	fmt.Printf("Work:           %x\n", b.Work)
 }
 
+func (b *ChangeBlock) Read(r io.Reader) *ChangeBlock {
+	io.ReadFull(r, b.Previous[:])
+	io.ReadFull(r, b.Representative[:])
+	binary.Read(r, binary.LittleEndian, &b.BlockCommon)
+	return b
+}
+
 func (b *ChangeBlock) Hash() types.Hash {
 	var buf bytes.Buffer
 	buf.Write(b.Previous[:])
@@ -36,4 +44,8 @@ func (b *ChangeBlock) Serialize() []byte {
 
 func (b *ChangeBlock) Type() Type {
 	return LegacyChange
+}
+
+func (b *ChangeBlock) GetPrevious() types.Hash {
+	return b.Previous
 }
