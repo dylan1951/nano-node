@@ -9,10 +9,9 @@ import (
 )
 
 const (
-	Invalid = iota
-	Blocks
-	AccountInfo
-	Frontiers
+	Blocks      = 1
+	AccountInfo = 2
+	Frontiers   = 3
 )
 
 type AscPullReqHeader struct {
@@ -64,7 +63,7 @@ type FrontiersPayload struct {
 	Count uint16
 }
 
-func BlocksRequest(start [32]byte, startType HashType) []byte {
+func BlocksRequest(start [32]byte, count uint8, startType HashType) []byte {
 	msg := NewHeader(MsgAscPullReq, 34).Serialize()
 	id := utils.Read[uint64](rand.Reader, binary.BigEndian)
 
@@ -75,7 +74,7 @@ func BlocksRequest(start [32]byte, startType HashType) []byte {
 
 	payload := BlocksPayload{
 		Start:     start,
-		Count:     50,
+		Count:     count,
 		StartType: startType,
 	}
 
@@ -87,7 +86,7 @@ func BlocksRequest(start [32]byte, startType HashType) []byte {
 
 func FrontiersRequest(start [32]byte, count uint16) []byte {
 	msg := NewHeader(MsgAscPullReq, 34).Serialize()
-	id := utils.Read[uint64](rand.Reader, binary.LittleEndian)
+	id := utils.Read[uint64](rand.Reader, binary.BigEndian)
 
 	header := AscPullReqHeader{
 		Type: Frontiers,

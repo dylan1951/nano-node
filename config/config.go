@@ -21,11 +21,15 @@ var ProtocolVersionMin = uint8(20)
 
 var ActiveDifficulty = uint64(0xFFFFF00000000000)
 
+var EpochV1 = types.Hash{'e', 'p', 'o', 'c', 'h', ' ', 'v', '1', ' ', 'b', 'l', 'o', 'c', 'k'}
+var EpochV2 = types.Hash{'e', 'p', 'o', 'c', 'h', ' ', 'v', '2', ' ', 'b', 'l', 'o', 'c', 'k'}
+
 type NetworkDetail struct {
-	Id      byte
-	Address string
-	Port    uint16
-	Genesis blocks.OpenBlock
+	Id            byte
+	Address       string
+	Port          uint16
+	Genesis       blocks.OpenBlock
+	EpochV2Signer types.PublicKey
 }
 
 var Networks = map[string]NetworkDetail{
@@ -61,6 +65,7 @@ var Networks = map[string]NetworkDetail{
 				Work:      0xe87a3ce39b43b84c,
 			},
 		},
+		EpochV2Signer: utils.MustDecodeHex32("259A438A8F9F9226130C84D902C237AF3E57C0981C7D709C288046B110D8C8AC"),
 	},
 }
 

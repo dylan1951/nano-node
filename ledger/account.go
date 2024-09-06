@@ -2,11 +2,15 @@ package ledger
 
 import (
 	"errors"
+	"fmt"
 	"github.com/accept-nano/ed25519-blake2b"
+	"log"
 	"node/blocks"
+	"node/config"
 	"node/store"
 	"node/types"
 	"node/types/uint128"
+	"node/utils"
 )
 
 type Account struct {
@@ -14,6 +18,7 @@ type Account struct {
 	Frontier  types.Hash
 	Height    uint64
 	Balance   uint128.Uint128
+	Version   uint8
 }
 
 func AccountFromPublicKey(publicKey types.PublicKey) *Account {
@@ -23,6 +28,7 @@ func AccountFromPublicKey(publicKey types.PublicKey) *Account {
 			Frontier:  record.Frontier,
 			Height:    record.Height,
 			Balance:   record.Balance,
+			Version:   record.Version,
 		}
 	}
 	return &Account{
@@ -30,22 +36,23 @@ func AccountFromPublicKey(publicKey types.PublicKey) *Account {
 	}
 }
 
-func PubKeyFromBlock(block blocks.Block) (*types.PublicKey, error) {
+func PubKeyFromBlock(block blocks.Block) *types.PublicKey {
 	switch block := block.(type) {
 	case *blocks.StateBlock:
-		return &block.Account, nil
+		return &block.Account
 	case *blocks.OpenBlock:
-		return &block.Account, nil
+		return &block.Account
 	default:
 		if previous := store.GetBlock(block.GetPrevious()); previous != nil {
-			return &previous.Account, nil
+			return &previous.Account
 		}
-		return nil, &MissingDependency{Dependency: block.GetPrevious()}
 	}
+	return nil
 }
 
 var Invalid = errors.New("invalid block")
 var Fork = errors.New("fork")
+var Old = errors.New("old")
 
 type MissingDependency struct {
 	Dependency types.Hash
@@ -58,16 +65,16 @@ func (e MissingDependency) Error() string {
 func (account *Account) AddBlock(block blocks.Block) error {
 	hash := block.Hash()
 
-	// todo: verify work
-
-	if !ed25519.Verify(account.PublicKey[:], hash[:], block.BlockCommon().Signature[:]) {
-		return Invalid
+	if store.GetBlock(hash) != nil {
+		fmt.Printf("already processed %s\n", hash.GoString())
+		return Old
 	}
 
 	if block.GetPrevious() != account.Frontier {
 		if record := store.GetBlock(block.GetPrevious()); record == nil {
 			return &MissingDependency{Dependency: block.GetPrevious()}
 		}
+		log.Fatalf("previous didn't match")
 		return Fork
 	}
 
@@ -76,14 +83,35 @@ func (account *Account) AddBlock(block blocks.Block) error {
 		Account: account.PublicKey,
 	}
 
+	signer := account.PublicKey[:]
+
+	if block, ok := block.(*blocks.StateBlock); ok && account.Balance == block.Balance {
+		switch block.Link {
+		case config.EpochV1:
+			signer = config.Network.Genesis.Account[:]
+		case config.EpochV2:
+			signer = config.Network.EpochV2Signer[:]
+		}
+	}
+
+	if !ed25519.Verify(signer, hash[:], block.Common().Signature[:]) {
+		fmt.Printf("signer: %s\n", utils.PubKeyToAddress(signer, false))
+		block.Print()
+		log.Fatalf("invalid account signature")
+		return Invalid
+	}
+
 	switch block := block.(type) {
 	case *blocks.OpenBlock:
+		println("is OpenBlock")
 		if err := account.Receive(block.Source); err != nil {
 			return err
 		}
 
 	case *blocks.SendBlock:
+		println("is SendBlock")
 		if block.Balance.Cmp(account.Balance) >= 0 {
+			log.Fatalf("sendblock invalid balance")
 			return Invalid
 		}
 
@@ -91,11 +119,13 @@ func (account *Account) AddBlock(block blocks.Block) error {
 		account.Balance = block.Balance
 
 	case *blocks.ReceiveBlock:
+		println("is ReceiveBlock")
 		if err := account.Receive(block.Source); err != nil {
 			return err
 		}
 
 	case *blocks.StateBlock:
+		println("is StateBlock")
 		isReceiving := block.Balance.Cmp(account.Balance) > 0
 		isSending := block.Balance.Cmp(account.Balance) < 0
 
@@ -107,7 +137,16 @@ func (account *Account) AddBlock(block blocks.Block) error {
 			newBlockRecord.Receivable = account.Balance.Sub(block.Balance)
 			account.Balance = block.Balance
 		} else {
-			if !block.Link.IsZero() {
+			isRepUnchanged := block.Representative == account.Representative()
+			isOpening := block.Previous.IsZero() && block.Representative.IsZero()
+
+			switch {
+			case block.Link == config.EpochV1 && account.Version == 0 && (isRepUnchanged || isOpening):
+				account.Version = 1
+			case block.Link == config.EpochV2 && account.Version == 1 && (isRepUnchanged || isOpening):
+				account.Version = 2
+			case !block.Link.IsZero():
+				log.Fatalf("link not zero")
 				return Invalid
 			}
 		}
@@ -118,6 +157,7 @@ func (account *Account) AddBlock(block blocks.Block) error {
 		Frontier: hash,
 		Height:   account.Height + 1,
 		Balance:  account.Balance,
+		Version:  account.Version,
 	})
 
 	return nil
@@ -137,13 +177,16 @@ func (account *Account) Receive(sourceHash types.Hash) error {
 	switch source := source.Block.(type) {
 	case *blocks.SendBlock:
 		if source.Destination != account.PublicKey {
+			log.Fatalf("destination mismatch")
 			return Invalid
 		}
 	case *blocks.StateBlock:
 		if source.Link != account.PublicKey {
+			log.Fatalf("link mismatch")
 			return Invalid
 		}
 	default:
+		log.Fatalf("can't receive from this kind of block")
 		return Invalid
 	}
 
@@ -169,4 +212,8 @@ func (account *Account) Representative() types.PublicKey {
 			record = store.GetBlock(block.Previous)
 		}
 	}
+}
+
+func (account *Account) Address() string {
+	return utils.PubKeyToAddress(account.PublicKey[:], false)
 }

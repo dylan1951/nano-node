@@ -25,7 +25,7 @@ type Block interface {
 	Hash() types.Hash
 	Serialize() []byte
 	Type() Type
-	BlockCommon() *BlockCommon
+	Common() *BlockCommon
 	GetPrevious() types.Hash
 }
 
@@ -34,7 +34,7 @@ type BlockCommon struct {
 	Work      uint64
 }
 
-func (bc *BlockCommon) BlockCommon() *BlockCommon {
+func (bc *BlockCommon) Common() *BlockCommon {
 	return bc
 }
 
@@ -56,11 +56,11 @@ func Read(r io.Reader) Block {
 		return (&ChangeBlock{}).Read(r)
 	case State:
 		return (&StateBlock{}).Read(r)
+	case NotABlock:
+		return nil
 	default:
 		panic(fmt.Sprintf("Unknown block type: %d", blockType))
 	}
-
-	return nil
 }
 
 func Deserialize(serialized []byte) Block {

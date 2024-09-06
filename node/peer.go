@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/netip"
+	"node/blocks"
 	"node/config"
 	"node/messages"
 	"node/types"
@@ -22,6 +23,7 @@ type Peer struct {
 	conn          net.Conn
 	mu            sync.Mutex
 	frontiersChan chan []*messages.Frontier
+	blocksChan    chan []blocks.Block
 }
 
 func NewPeer(conn net.Conn) *Peer {
@@ -29,6 +31,7 @@ func NewPeer(conn net.Conn) *Peer {
 	p.conn = conn
 	p.cookie = make([]byte, 32)
 	p.frontiersChan = make(chan []*messages.Frontier)
+	p.blocksChan = make(chan []blocks.Block)
 	p.mu.Lock()
 
 	if _, err := rand.Read(p.cookie); err != nil {
@@ -43,6 +46,14 @@ func (p *Peer) RequestFrontiers(start [32]byte, count uint16) chan []*messages.F
 	frontiersReq := messages.FrontiersRequest(start, count)
 	p.conn.Write(frontiersReq)
 	return p.frontiersChan
+}
+
+func (p *Peer) RequestBlocks(start [32]byte, count uint8) chan []blocks.Block {
+	p.mu.Lock()
+	blocksReq := messages.BlocksRequest(start, count, messages.Block)
+	p.conn.Write(blocksReq)
+	println("sent blocks request")
+	return p.blocksChan
 }
 
 func (p *Peer) handleMessages() {
@@ -71,8 +82,10 @@ func (p *Peer) handleMessages() {
 }
 
 func (p *Peer) handleAscPullAck(msg messages.AscPullAck) {
+	println("handling AscPullAck")
 	if len(msg.Blocks) > 0 {
-		// TODO: implement
+		println("received blocks")
+		p.blocksChan <- msg.Blocks
 	} else if len(msg.Frontiers) > 0 {
 		p.frontiersChan <- msg.Frontiers
 	} else {

@@ -40,12 +40,13 @@ func (b *StateBlock) Read(r io.Reader) *StateBlock {
 	io.ReadFull(r, b.Representative[:])
 	b.Balance = uint128.ReadBE(r)
 	io.ReadFull(r, b.Link[:])
-	binary.Read(r, binary.LittleEndian, &b.BlockCommon)
+	binary.Read(r, binary.BigEndian, &b.BlockCommon)
 	return b
 }
 
 func (b *StateBlock) Print() {
-	fmt.Printf("AccountRecord: 		%s\n", hex.EncodeToString(b.Account[:]))
+	fmt.Printf("Hash: 		%s\n", b.Hash().GoString())
+	fmt.Printf("Account: 		%s\n", hex.EncodeToString(b.Account[:]))
 	fmt.Printf("Previous: 		%s\n", hex.EncodeToString(b.Previous[:]))
 	fmt.Printf("Representative: 	%s\n", hex.EncodeToString(b.Representative[:]))
 	fmt.Printf("Balance:        	%s\n", b.Balance.String())

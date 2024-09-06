@@ -10,7 +10,6 @@ import (
 	"node/blocks"
 	"node/types"
 	"node/types/uint128"
-	"node/utils"
 )
 
 var db, _ = pebble.Open("data", &pebble.Options{})
@@ -30,26 +29,46 @@ type AccountRecord struct {
 	Frontier types.Hash
 	Balance  uint128.Uint128
 	Height   uint64
+	Version  uint8
 }
 
 func (b *BlockRecord) Serialize() []byte {
-	return []byte{}
+	data := b.Block.Serialize()
+	data = append(data, b.Account[:]...)
+	data = append(data, b.Receivable.Bytes()...)
+	return data
 }
 
-func (b *BlockRecord) Deserialize([]byte) {
-
+func (b *BlockRecord) Deserialize(data []byte) *BlockRecord {
+	reader := bytes.NewReader(data)
+	b.Block = blocks.Read(reader)
+	_, _ = reader.Read(b.Account[:])
+	b.Receivable = uint128.Read(reader)
+	return b
 }
 
 func (a *AccountRecord) Serialize() []byte {
-	return []byte{}
+	data := a.Frontier[:]
+	data = append(data, a.Balance.Bytes()...)
+	heightBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(heightBytes, a.Height)
+	data = append(data, heightBytes...)
+	return append(data, a.Version)
 }
 
-func (a *AccountRecord) Deserialize([]byte) {
-
+func (a *AccountRecord) Deserialize(data []byte) *AccountRecord {
+	reader := bytes.NewReader(data)
+	_, _ = reader.Read(a.Frontier[:])
+	a.Balance = uint128.Read(reader)
+	heightBytes := make([]byte, 8)
+	_, _ = reader.Read(heightBytes)
+	a.Height = binary.BigEndian.Uint64(heightBytes)
+	a.Version, _ = reader.ReadByte()
+	return a
 }
 
 func SetAccount(publicKey [32]byte, account AccountRecord) {
-	if err := db.Set(publicKey[:], utils.Serialize(account, binary.LittleEndian), pebble.Sync); err != nil {
+	if err := db.Set(publicKey[:], account.Serialize(), pebble.Sync); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -65,19 +84,7 @@ func GetAccount(publicKey types.PublicKey) *AccountRecord {
 		log.Fatal(err)
 	}
 
-	return utils.Read[AccountRecord](bytes.NewReader(serialized), binary.LittleEndian)
-}
-
-func SetPull(hash [32]byte, val byte) {
-	if err := db.Set(hash[:], []byte{val}, pebble.Sync); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func DeletePull(hash [32]byte) {
-	if err := db.Delete(hash[:], pebble.Sync); err != nil {
-		log.Fatal(err)
-	}
+	return (&AccountRecord{}).Deserialize(serialized)
 }
 
 func PutBlock(blockHash types.Hash, record BlockRecord) {
@@ -99,7 +106,7 @@ func GetBlock(blockHash [32]byte) *BlockRecord {
 		log.Fatal(err)
 	}
 
-	return blocks.Deserialize(serialized)
+	return (&BlockRecord{}).Deserialize(serialized)
 }
 
 func GetLastBlockHash() [32]byte {

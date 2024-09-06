@@ -10,7 +10,7 @@ import (
 	"node/types/uint128"
 )
 
-var queue = make(chan blocks.Block, 1000)
+var Queue = make(chan blocks.Block, 1000)
 var blocked = make(map[types.Hash]blocks.Block)
 
 func Init() {
@@ -29,9 +29,17 @@ func Init() {
 }
 
 func ProcessBlocks() {
-	for block := range queue {
+	for block := range Queue {
 		publicKey := PubKeyFromBlock(block)
-		account := AccountFromPublicKey(publicKey)
+
+		if publicKey == nil {
+			fmt.Printf("missing dependency %#v\n", block.GetPrevious())
+			continue
+		}
+
+		fmt.Printf("ledger processing block: %s\n", block.Hash().GoString())
+
+		account := AccountFromPublicKey(*publicKey)
 		err := account.AddBlock(block)
 
 		var missingDep MissingDependency
@@ -41,7 +49,7 @@ func ProcessBlocks() {
 		case errors.Is(err, Fork):
 			println("block is a fork")
 		case errors.As(err, &missingDep):
-			fmt.Printf("missing dependency %#v", missingDep.Dependency)
+			fmt.Printf("missing dependency %#v\n", missingDep.Dependency)
 			blocked[missingDep.Dependency] = block
 		}
 	}

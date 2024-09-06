@@ -2,8 +2,6 @@ package messages
 
 import (
 	"encoding/binary"
-	"encoding/hex"
-	"fmt"
 	"io"
 	"log"
 	"node/blocks"
@@ -13,7 +11,7 @@ import (
 
 type AscPullAck struct {
 	Frontiers []*Frontier
-	Blocks    []*blocks.Block
+	Blocks    []blocks.Block
 }
 
 type Frontier struct {
@@ -36,18 +34,15 @@ func ReadAscPullAck(r io.Reader, extensions Extensions) AscPullAck {
 
 	switch header.Type {
 	case Blocks:
-		ack.Blocks = make([]*blocks.Block, 0)
+		ack.Blocks = make([]blocks.Block, 0)
 
 		for b := blocks.Read(r); b != nil; b = blocks.Read(r) {
-			hash := b.Hash()
-			fmt.Println(hex.EncodeToString(hash[:]))
-			ack.Blocks = append(ack.Blocks, &b)
+			ack.Blocks = append(ack.Blocks, b)
 		}
 	case Frontiers:
 		ack.Frontiers = make([]*Frontier, 0)
 
 		for f := utils.Read[Frontier](r, binary.BigEndian); !f.IsZero(); f = utils.Read[Frontier](r, binary.BigEndian) {
-			//fmt.Printf("frontier for %s is %s\n", f.AccountRecord.GoString(), f.Hash.GoString())
 			ack.Frontiers = append(ack.Frontiers, f)
 		}
 	default:
