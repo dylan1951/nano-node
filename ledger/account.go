@@ -97,7 +97,7 @@ func (account *Account) AddBlock(block blocks.Block) error {
 	if !ed25519.Verify(signer, hash[:], block.Common().Signature[:]) {
 		fmt.Printf("signer: %s\n", utils.PubKeyToAddress(signer, false))
 		block.Print()
-		log.Fatalf("invalid account signature")
+		log.Fatalf("invalid signature")
 		return Invalid
 	}
 
