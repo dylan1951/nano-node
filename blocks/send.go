@@ -13,8 +13,8 @@ import (
 )
 
 type SendBlock struct {
-	Previous    [32]byte
-	Destination [32]byte
+	Previous    types.Hash
+	Destination types.PublicKey
 	Balance     uint128.Uint128
 	BlockCommon
 }

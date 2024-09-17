@@ -1,34 +1,62 @@
 package node
 
 import (
+	"errors"
 	"fmt"
-	"node/config"
+	"node/blocks"
 	"node/ledger"
-	"node/types"
+	"node/messages"
+	"node/store"
 )
 
-var pool = make(chan types.Hash, 1000)
+const pullSize = 128
 
 func Bootstrap() {
 	println("starting bootstrap")
 
-	pool <- config.Network.Genesis.Hash()
+	account := ledger.GetUnsyncedAccount()
 
 	for {
 		for _, peer := range peers {
-			if peer != nil {
-				hash := <-pool
-				fmt.Printf("requesting 10 blocks starting from %s from %s\n", hash.GoString(), peer.AddrPort().String())
-				blocks := <-peer.RequestBlocks(hash, 10)
-				if len(blocks) != 10 {
-					fmt.Printf("received %d blocks instead of 10\n", len(blocks))
-				} else {
-					fmt.Printf("received %d blocks, adding the latest hash back to the pool\n", len(blocks))
-					pool <- blocks[9].Hash()
+			if peer == nil {
+				continue
+			}
+
+			var pull []blocks.Block
+
+			if account.Height == 0 {
+				fmt.Printf("asking for %d blocks starting from account %v from %s\n", pullSize, account.PublicKey.GoString(), peer.AddrPort().String())
+				pull = <-peer.RequestBlocks(account.PublicKey, pullSize, messages.Account)
+			} else {
+				fmt.Printf("asking for %d blocks starting from block %v from %s\n", pullSize, account.Frontier.GoString(), peer.AddrPort().String())
+				pull = <-peer.RequestBlocks(account.Frontier, pullSize, messages.Block)
+			}
+
+			fmt.Printf("received %d blocks from %s\n", len(pull), peer.AddrPort().String())
+
+			for _, block := range pull {
+				if err := account.AddBlock(block); err != nil {
+					var missingDep ledger.MissingDependency
+					switch {
+					case errors.Is(err, ledger.Invalid):
+						panic("block is invalid")
+					case errors.Is(err, ledger.Fork):
+						panic("block is a fork")
+					case errors.Is(err, ledger.Old):
+						// ignore for now
+					case errors.As(err, &missingDep):
+						fmt.Printf("missing dependency %v\n", missingDep.Dependency.GoString())
+						panic(err)
+					default:
+						panic(err)
+					}
 				}
-				for _, block := range blocks {
-					ledger.Queue <- block
-				}
+			}
+
+			if len(pull) < pullSize {
+				fmt.Printf("account %v is fully synced at frontier: %v\n", account.PublicKey.GoString(), account.Frontier.GoString())
+				store.MarkAccountSynced(account.PublicKey)
+				account = ledger.GetUnsyncedAccount()
 			}
 		}
 	}

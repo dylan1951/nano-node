@@ -3,10 +3,12 @@ package node
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"net/netip"
 	"node/config"
 	"node/messages"
+	"node/store"
 	"sync"
 	"time"
 )
@@ -73,10 +75,25 @@ func countLivePeers() (count uint32) {
 	return
 }
 
+func KeepAliveSender() {
+	ticker := time.NewTicker(config.Network.KeepAlivePeriod)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		keepAlive := KeepAlive()
+
+		for _, peer := range peers {
+			if peer != nil {
+				peer.SendKeepAlive(keepAlive)
+			}
+		}
+	}
+}
+
 func Telemetry() messages.TelemetryData {
 	return messages.TelemetryData{
 		NodeId:            [32]byte(config.PublicKey),
-		BlockCount:        0,
+		BlockCount:        store.CountBlocks(),
 		CementedCount:     0,
 		UncheckedCount:    0,
 		AccountCount:      0,
@@ -93,4 +110,23 @@ func Telemetry() messages.TelemetryData {
 		Timestamp:         uint64(time.Now().UnixMilli()),
 		ActiveDifficulty:  config.ActiveDifficulty,
 	}
+}
+
+func KeepAlive() [8]netip.AddrPort {
+	var result [8]netip.AddrPort
+	keys := make([][16]byte, 0, len(peers))
+	for k, peer := range peers {
+		if peer != nil {
+			keys = append(keys, k)
+		}
+	}
+	rand.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
+	for i := 0; i < 8; i++ {
+		if i < len(keys) {
+			result[i] = netip.AddrPortFrom(netip.AddrFrom16(keys[i]), config.Network.Port)
+		} else {
+			result[i] = netip.AddrPortFrom(netip.IPv6Unspecified(), 0)
+		}
+	}
+	return result
 }

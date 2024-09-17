@@ -48,12 +48,18 @@ func (p *Peer) RequestFrontiers(start [32]byte, count uint16) chan []*messages.F
 	return p.frontiersChan
 }
 
-func (p *Peer) RequestBlocks(start [32]byte, count uint8) chan []blocks.Block {
+func (p *Peer) RequestBlocks(start [32]byte, count uint8, startType messages.HashType) chan []blocks.Block {
 	p.mu.Lock()
-	blocksReq := messages.BlocksRequest(start, count, messages.Block)
+	blocksReq := messages.BlocksRequest(start, count, startType)
 	p.conn.Write(blocksReq)
 	println("sent blocks request")
 	return p.blocksChan
+}
+
+func (p *Peer) SendKeepAlive(keepAlive messages.KeepAlive) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	keepAlive.WriteTo(p.conn)
 }
 
 func (p *Peer) handleMessages() {
@@ -83,14 +89,14 @@ func (p *Peer) handleMessages() {
 
 func (p *Peer) handleAscPullAck(msg messages.AscPullAck) {
 	println("handling AscPullAck")
-	if len(msg.Blocks) > 0 {
-		println("received blocks")
-		p.blocksChan <- msg.Blocks
-	} else if len(msg.Frontiers) > 0 {
-		p.frontiersChan <- msg.Frontiers
-	} else {
-		log.Fatalf("Empty AscPullAck message")
-	}
+	p.blocksChan <- msg.Blocks
+	// todo: fix (can't know if blocks or frontiers)
+	//if len(msg.Blocks) > 0 {
+	//	println("received blocks")
+	//	p.blocksChan <- msg.Blocks
+	//} else if len(msg.Frontiers) > 0 {
+	//	p.frontiersChan <- msg.Frontiers
+	//}
 	p.mu.Unlock()
 }
 

@@ -48,6 +48,12 @@ func Serialize(obj interface{}, order binary.ByteOrder) []byte {
 	return buf.Bytes()
 }
 
+func Deserialize(data []byte, obj interface{}, order binary.ByteOrder) {
+	if err := binary.Read(bytes.NewReader(data), order, obj); err != nil {
+		log.Fatal(err)
+	}
+}
+
 func Read[T any](reader io.Reader, order binary.ByteOrder) *T {
 	ret := new(T)
 	if err := binary.Read(reader, order, ret); err != nil {

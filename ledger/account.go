@@ -36,18 +36,13 @@ func AccountFromPublicKey(publicKey types.PublicKey) *Account {
 	}
 }
 
-func PubKeyFromBlock(block blocks.Block) *types.PublicKey {
-	switch block := block.(type) {
-	case *blocks.StateBlock:
-		return &block.Account
-	case *blocks.OpenBlock:
-		return &block.Account
-	default:
-		if previous := store.GetBlock(block.GetPrevious()); previous != nil {
-			return &previous.Account
-		}
+func GetUnsyncedAccount() *Account {
+	publicKey, err := store.GetUnsyncedAccount()
+	if err != nil {
+		panic(err)
 	}
-	return nil
+	fmt.Printf("%s\n", publicKey.GoString())
+	return AccountFromPublicKey(*publicKey)
 }
 
 var Invalid = errors.New("invalid block")
@@ -72,9 +67,10 @@ func (account *Account) AddBlock(block blocks.Block) error {
 
 	if block.GetPrevious() != account.Frontier {
 		if record := store.GetBlock(block.GetPrevious()); record == nil {
+			fmt.Printf("block %s is missing previous block: %s\n", block.Hash().GoString(), block.GetPrevious().GoString())
 			return &MissingDependency{Dependency: block.GetPrevious()}
 		}
-		log.Fatalf("previous didn't match")
+		log.Fatalf("previous %s doesn't match frontier: %s\n", block.GetPrevious().GoString(), account.Frontier.GoString())
 		return Fork
 	}
 
@@ -103,13 +99,11 @@ func (account *Account) AddBlock(block blocks.Block) error {
 
 	switch block := block.(type) {
 	case *blocks.OpenBlock:
-		println("is OpenBlock")
 		if err := account.Receive(block.Source); err != nil {
 			return err
 		}
 
 	case *blocks.SendBlock:
-		println("is SendBlock")
 		if block.Balance.Cmp(account.Balance) >= 0 {
 			log.Fatalf("sendblock invalid balance")
 			return Invalid
@@ -118,32 +112,42 @@ func (account *Account) AddBlock(block blocks.Block) error {
 		newBlockRecord.Receivable = account.Balance.Sub(block.Balance)
 		account.Balance = block.Balance
 
+		if !block.Destination.IsZero() {
+			// ensure not burn address
+			store.MarkAccountUnsynced(block.Destination)
+		}
+
 	case *blocks.ReceiveBlock:
-		println("is ReceiveBlock")
 		if err := account.Receive(block.Source); err != nil {
 			return err
 		}
 
 	case *blocks.StateBlock:
-		println("is StateBlock")
 		isReceiving := block.Balance.Cmp(account.Balance) > 0
 		isSending := block.Balance.Cmp(account.Balance) < 0
 
-		if isReceiving {
+		switch {
+		case isReceiving:
 			if err := account.Receive(block.Link); err != nil {
 				return err
 			}
-		} else if isSending {
+
+			if account.Balance != block.Balance {
+				return Invalid
+			}
+		case isSending:
 			newBlockRecord.Receivable = account.Balance.Sub(block.Balance)
 			account.Balance = block.Balance
-		} else {
+			if !block.Link.IsZero() {
+				// ensure not burn address
+				store.MarkAccountUnsynced(block.Link)
+			}
+		default:
 			isRepUnchanged := block.Representative == account.Representative()
-			isOpening := block.Previous.IsZero() && block.Representative.IsZero()
-
 			switch {
-			case block.Link == config.EpochV1 && account.Version == 0 && (isRepUnchanged || isOpening):
+			case block.Link == config.EpochV1 && account.Version == 0 && isRepUnchanged:
 				account.Version = 1
-			case block.Link == config.EpochV2 && account.Version == 1 && (isRepUnchanged || isOpening):
+			case block.Link == config.EpochV2 && account.Version == 1 && isRepUnchanged:
 				account.Version = 2
 			case !block.Link.IsZero():
 				log.Fatalf("link not zero")
@@ -152,10 +156,13 @@ func (account *Account) AddBlock(block blocks.Block) error {
 		}
 	}
 
+	account.Frontier = hash
+	account.Height++
+
 	store.PutBlock(hash, newBlockRecord)
 	store.SetAccount(account.PublicKey, store.AccountRecord{
-		Frontier: hash,
-		Height:   account.Height + 1,
+		Frontier: account.Frontier,
+		Height:   account.Height,
 		Balance:  account.Balance,
 		Version:  account.Version,
 	})
@@ -190,13 +197,17 @@ func (account *Account) Receive(sourceHash types.Hash) error {
 		return Invalid
 	}
 
-	account.Balance.Add(source.Receivable)
+	account.Balance = account.Balance.Add(source.Receivable)
 
 	return nil
 }
 
 func (account *Account) Representative() types.PublicKey {
 	record := store.GetBlock(account.Frontier)
+
+	if record == nil {
+		return types.PublicKey{}
+	}
 
 	for {
 		switch block := record.Block.(type) {
