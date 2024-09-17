@@ -23,13 +23,19 @@ func Bootstrap() {
 			}
 
 			var pull []blocks.Block
+			var ok bool
 
 			if account.Height == 0 {
 				fmt.Printf("asking for %d blocks starting from account %v from %s\n", pullSize, account.PublicKey.GoString(), peer.AddrPort().String())
-				pull = <-peer.RequestBlocks(account.PublicKey, pullSize, messages.Account)
+				pull, ok = <-peer.RequestBlocks(account.PublicKey, pullSize, messages.Account)
 			} else {
 				fmt.Printf("asking for %d blocks starting from block %v from %s\n", pullSize, account.Frontier.GoString(), peer.AddrPort().String())
-				pull = <-peer.RequestBlocks(account.Frontier, pullSize, messages.Block)
+				pull, ok = <-peer.RequestBlocks(account.Frontier, pullSize, messages.Block)
+			}
+
+			if !ok {
+				fmt.Printf("peer died, continuing")
+				continue
 			}
 
 			fmt.Printf("received %d blocks from %s\n", len(pull), peer.AddrPort().String())

@@ -67,6 +67,8 @@ func (p *Peer) handleMessages() {
 		if r := recover(); r != nil {
 			fmt.Println("peer disconnected:", p.AddrPort().String(), r)
 			peers[p.AddrPort().Addr().As16()] = nil
+			close(p.frontiersChan)
+			close(p.blocksChan)
 		}
 	}()
 

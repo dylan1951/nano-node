@@ -174,6 +174,7 @@ func (account *Account) Receive(sourceHash types.Hash) error {
 	source := store.GetBlock(sourceHash)
 
 	if source == nil {
+		fmt.Printf("account %s is missing souce: %s\n", account.PublicKey.GoString(), sourceHash.GoString())
 		return &MissingDependency{Dependency: sourceHash}
 	}
 
