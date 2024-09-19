@@ -3,6 +3,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"github.com/cockroachdb/pebble"
 	"node/blocks"
 	"node/ledger"
 	"node/messages"
@@ -34,38 +35,52 @@ func Bootstrap() {
 			}
 
 			if !ok {
-				fmt.Printf("peer died, continuing")
-				continue
+				panic("peer died")
 			}
 
 			fmt.Printf("received %d blocks from %s\n", len(pull), peer.AddrPort().String())
 
-			for _, block := range pull {
-				if err := account.AddBlock(block); err != nil {
-					var missingDep ledger.MissingDependency
-					switch {
-					case errors.Is(err, ledger.Invalid):
-						panic("block is invalid")
-					case errors.Is(err, ledger.Fork):
-						panic("block is a fork")
-					case errors.Is(err, ledger.Old):
-						// ignore for now
-					case errors.As(err, &missingDep):
-						fmt.Printf("missing dependency %v\n", missingDep.Dependency.GoString())
-						panic(err)
-					default:
-						panic(err)
-					}
-				}
+			batch := store.NewBatch()
+
+			missingDep := processBlocks(batch, account, pull)
+
+			if err := batch.Commit(nil); err != nil {
+				panic(err)
 			}
 
-			if len(pull) < pullSize {
+			if missingDep != nil {
+				account = ledger.GetUnsyncedAccount()
+			} else if len(pull) < pullSize {
 				fmt.Printf("account %v is fully synced at frontier: %v\n", account.PublicKey.GoString(), account.Frontier.GoString())
 				store.MarkAccountSynced(account.PublicKey)
 				account = ledger.GetUnsyncedAccount()
 			}
 		}
 	}
+}
+
+func processBlocks(batch *pebble.Batch, account *ledger.Account, blocks []blocks.Block) error {
+	for _, block := range blocks {
+		if err := account.AddBlock(batch, block); err != nil {
+			var missingDep *ledger.MissingDependency
+			switch {
+			case errors.Is(err, ledger.Invalid):
+				panic("block is invalid")
+			case errors.Is(err, ledger.Fork):
+				panic("block is a fork")
+			case errors.Is(err, ledger.Old):
+				// ignore for now
+			case errors.As(err, &missingDep):
+				fmt.Printf("missing dependency %v\n", missingDep.Dependency.GoString())
+				store.MarkAccountBlocked(batch, account.PublicKey, missingDep.Dependency)
+				return err
+			default:
+				panic(err)
+			}
+		}
+		store.MarkDependencyResolved(batch, block.Hash())
+	}
+	return nil
 }
 
 func ScanFrontiers() {

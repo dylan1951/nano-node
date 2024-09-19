@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/accept-nano/ed25519-blake2b"
+	"github.com/cockroachdb/pebble"
 	"log"
 	"node/blocks"
 	"node/config"
@@ -57,7 +58,7 @@ func (e MissingDependency) Error() string {
 	return "dependency missing"
 }
 
-func (account *Account) AddBlock(block blocks.Block) error {
+func (account *Account) AddBlock(batch *pebble.Batch, block blocks.Block) error {
 	hash := block.Hash()
 
 	if store.GetBlock(hash) != nil {
@@ -114,7 +115,7 @@ func (account *Account) AddBlock(block blocks.Block) error {
 
 		if !block.Destination.IsZero() {
 			// ensure not burn address
-			store.MarkAccountUnsynced(block.Destination)
+			store.MarkAccountUnsynced(batch, block.Destination)
 		}
 
 	case *blocks.ReceiveBlock:
@@ -140,7 +141,7 @@ func (account *Account) AddBlock(block blocks.Block) error {
 			account.Balance = block.Balance
 			if !block.Link.IsZero() {
 				// ensure not burn address
-				store.MarkAccountUnsynced(block.Link)
+				store.MarkAccountUnsynced(batch, block.Link)
 			}
 		default:
 			isRepUnchanged := block.Representative == account.Representative()
@@ -159,8 +160,8 @@ func (account *Account) AddBlock(block blocks.Block) error {
 	account.Frontier = hash
 	account.Height++
 
-	store.PutBlock(hash, newBlockRecord)
-	store.SetAccount(account.PublicKey, store.AccountRecord{
+	store.PutBlock(batch, hash, newBlockRecord)
+	store.SetAccount(batch, account.PublicKey, store.AccountRecord{
 		Frontier: account.Frontier,
 		Height:   account.Height,
 		Balance:  account.Balance,

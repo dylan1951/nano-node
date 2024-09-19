@@ -3,7 +3,6 @@ package messages
 import (
 	"bytes"
 	"io"
-	"log"
 	"net/netip"
 )
 
@@ -30,7 +29,7 @@ func (ka KeepAlive) WriteTo(w io.Writer) {
 
 	for _, addrPort := range ka {
 		if addrPort.Addr().Is4() {
-			log.Fatalf("addr should not be ipv4")
+			panic("addr should not be ipv4")
 		}
 		b, _ := addrPort.MarshalBinary()
 		_, _ = response.Write(b)

@@ -36,11 +36,15 @@ type AccountRecord struct {
 	Version  uint8
 }
 
+func NewBatch() *pebble.Batch {
+	return db.NewIndexedBatch()
+}
+
 // MarkAccountUnsynced marks a new account as unsynced
-func MarkAccountUnsynced(publicKey types.PublicKey) {
+func MarkAccountUnsynced(batch *pebble.Batch, publicKey types.PublicKey) {
 	fmt.Printf("Marking unsynced account %s\n", publicKey.GoString())
 	key := append(PrefixUnsyncedAccount, publicKey[:]...)
-	if err := db.Set(key, []byte{}, pebble.Sync); err != nil {
+	if err := batch.Set(key, []byte{}, pebble.Sync); err != nil {
 		panic(err)
 	}
 }
@@ -54,27 +58,39 @@ func MarkAccountSynced(publicKey types.PublicKey) {
 }
 
 // MarkAccountBlocked marks an unsynced account as blocked by a given dependency.
-func MarkAccountBlocked(publicKey types.PublicKey, dependency types.Hash) {
+func MarkAccountBlocked(batch *pebble.Batch, publicKey types.PublicKey, dependency types.Hash) {
 	key := append(PrefixUnsyncedAccount, publicKey[:]...)
-	if err := db.Delete(key, pebble.Sync); err != nil {
+	if err := batch.Delete(key, pebble.Sync); err != nil {
 		panic(err)
 	}
 
 	key = append(PrefixBlockedAccount, dependency[:]...)
-	if err := db.Set(key, publicKey[:], pebble.Sync); err != nil {
+	if err := batch.Set(key, publicKey[:], pebble.Sync); err != nil {
 		panic(err)
 	}
 }
 
-// MarkAccountUnblocked marks an account as unblocked and moves it back to the unsynced set.
-func MarkAccountUnblocked(publicKey types.PublicKey, dependency types.Hash) {
+// MarkDependencyResolved marks an account as unblocked and moves it back to the unsynced set.
+func MarkDependencyResolved(batch *pebble.Batch, dependency types.Hash) {
 	key := append(PrefixBlockedAccount, dependency[:]...)
-	if err := db.Delete(key, pebble.Sync); err != nil {
+	serialized, closer, err := batch.Get(key)
+
+	if err != nil {
+		return
+	}
+
+	publicKey := types.PublicKey(serialized)
+
+	if err := closer.Close(); err != nil {
 		panic(err)
 	}
 
-	key = append(PrefixUnsyncedAccount, dependency[:]...)
-	if err := db.Set(key, publicKey[:], pebble.Sync); err != nil {
+	if err := batch.Delete(key, pebble.Sync); err != nil {
+		panic(err)
+	}
+
+	key = append(PrefixUnsyncedAccount, publicKey[:]...)
+	if err := batch.Set(key, publicKey[:], pebble.Sync); err != nil {
 		panic(err)
 	}
 }
@@ -119,7 +135,7 @@ func (a *AccountRecord) Deserialize(data []byte) *AccountRecord {
 	return a
 }
 
-func SetAccount(publicKey [32]byte, account AccountRecord) {
+func SetAccount(batch *pebble.Batch, publicKey [32]byte, account AccountRecord) {
 	key := append(PrefixAccount, publicKey[:]...)
 	if err := db.Set(key, account.Serialize(), pebble.Sync); err != nil {
 		panic(err)
@@ -141,7 +157,7 @@ func GetAccount(publicKey types.PublicKey) *AccountRecord {
 	return (&AccountRecord{}).Deserialize(serialized)
 }
 
-func PutBlock(blockHash types.Hash, record BlockRecord) {
+func PutBlock(batch *pebble.Batch, blockHash types.Hash, record BlockRecord) {
 	key := append(PrefixBlock, blockHash[:]...)
 	if err := db.Set(key, record.Serialize(), pebble.Sync); err != nil {
 		panic(err)
